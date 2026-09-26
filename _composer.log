@@ -1,0 +1,42 @@
+./composer.json has been updated
+Running composer update laravel/telescope
+Loading composer repositories with package information
+Updating dependencies
+Lock file operations: 1 install, 0 updates, 0 removals
+  - Locking laravel/telescope (v5.25.0)
+Writing lock file
+Installing dependencies from lock file (including require-dev)
+Package operations: 1 install, 0 updates, 0 removals
+  - Downloading laravel/telescope (v5.25.0)
+  - Installing laravel/telescope (v5.25.0): Extracting archive
+Generating optimized autoload files
+> Illuminate\Foundation\ComposerScripts::postAutoloadDump
+> @php artisan package:discover --ansi
+
+ INFO Discovering packages. 
+
+ barryvdh/laravel-dompdf .. DONE
+ inertiajs/inertia-laravel .. DONE
+ laravel/fortify .. DONE
+ laravel/horizon .. DONE
+ laravel/pail .. DONE
+ laravel/pao .. DONE
+ laravel/passkeys .. DONE
+ laravel/sail .. DONE
+ laravel/sentinel .. DONE
+ laravel/telescope .. DONE
+ laravel/tinker .. DONE
+ laravel/wayfinder .. DONE
+ maatwebsite/excel .. DONE
+ nesbot/carbon .. DONE
+ nunomaduro/collision .. DONE
+ nunomaduro/termwind .. DONE
+
+98 packages you are using are looking for funding.
+Use the `composer fund` command to find out more!
+> @php artisan vendor:publish --tag=laravel-assets --ansi --force
+
+ INFO No publishable resources for tag [laravel-assets]. 
+
+No security vulnerability advisories found.
+Using version ^5.25 for laravel/telescope

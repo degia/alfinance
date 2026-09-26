@@ -1,0 +1,319 @@
+@import 'tailwindcss';
+
+@import 'tw-animate-css';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+|--------------------------------------------------------------------------
+| Design Tokens — Alfinance
+|--------------------------------------------------------------------------
+| Neumorphism + palet White / Blue / Purple.
+| Semua komponen WAJIB memakai token di file ini, jangan hardcode warna/shadow.
+| Referensi: resources/css/app.css
+*/
+
+@theme inline {
+    --font-sans:
+        Instrument Sans, ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+
+    --color-surface: var(--surface);
+    --color-surface-foreground: var(--surface-foreground);
+    --color-surface-muted: var(--surface-muted);
+    --color-surface-muted-foreground: var(--surface-muted-foreground);
+
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-income: var(--income);
+    --color-expense: var(--expense);
+
+    --color-sidebar: var(--sidebar-background);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/*
+| Neumorphism shadows.
+| `neu-light` = sisi highlight, `neu-dark` = sisi bayangan.
+| Dark mode meng-override nilai ini di blok `.dark` bawah.
+*/
+@theme {
+    --shadow-neu-flat:
+        -5px -5px 10px var(--neu-light), 5px 5px 10px var(--neu-dark);
+    --shadow-neu-flat-sm:
+        -3px -3px 6px var(--neu-light), 3px 3px 6px var(--neu-dark);
+    --shadow-neu-raised:
+        -9px -9px 20px var(--neu-light), 9px 9px 20px var(--neu-dark);
+    --shadow-neu-hover:
+        -7px -7px 15px var(--neu-light), 7px 7px 15px var(--neu-dark);
+    --shadow-neu-pressed:
+        inset -4px -4px 8px var(--neu-light), inset 4px 4px 8px var(--neu-dark);
+    --shadow-neu-pressed-sm:
+        inset -2px -2px 5px var(--neu-light), inset 2px 2px 5px var(--neu-dark);
+    --shadow-neu-inset:
+        inset 2px 2px 5px var(--neu-dark), inset -2px -2px 5px var(--neu-light);
+    --shadow-neu-primary:
+        -3px -3px 7px var(--neu-primary-light),
+        5px 5px 12px var(--neu-primary-dark);
+    --shadow-neu-accent:
+        -3px -3px 7px var(--neu-accent-light),
+        5px 5px 12px var(--neu-accent-dark);
+}
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--color-gray-200, currentColor);
+    }
+}
+
+@layer utilities {
+    body,
+    html {
+        --font-sans:
+            'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
+            'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+            'Noto Color Emoji';
+    }
+}
+
+:root {
+    /* Brand */
+    --primary: hsl(221 83% 53%);
+    --primary-foreground: hsl(0 0% 100%);
+    --accent: hsl(262 83% 58%);
+    --accent-foreground: hsl(0 0% 100%);
+
+    /* Surface */
+    --background: hsl(214 42% 96%);
+    --foreground: hsl(222 47% 11%);
+    --surface: hsl(214 42% 96%);
+    --surface-foreground: hsl(222 47% 11%);
+    --surface-muted: hsl(214 38% 93%);
+    --surface-muted-foreground: hsl(215 18% 42%);
+    --card: hsl(0 0% 100%);
+    --card-foreground: hsl(222 47% 11%);
+    --popover: hsl(0 0% 100%);
+    --popover-foreground: hsl(222 47% 11%);
+
+    --secondary: hsl(262 60% 95%);
+    --secondary-foreground: hsl(262 52% 32%);
+    --muted: hsl(214 38% 94%);
+    --muted-foreground: hsl(215 18% 42%);
+
+    --destructive: hsl(0 72% 51%);
+    --destructive-foreground: hsl(0 0% 100%);
+    --success: hsl(152 62% 38%);
+    --success-foreground: hsl(0 0% 100%);
+    --warning: hsl(38 92% 45%);
+    --warning-foreground: hsl(0 0% 100%);
+
+    --border: hsl(214 30% 89%);
+    --input: hsl(214 30% 90%);
+    --ring: hsl(221 83% 53%);
+
+    /* Chart palette: biru & ungu sebagai warna utama */
+    --chart-1: hsl(221 83% 53%);
+    --chart-2: hsl(262 83% 58%);
+    --chart-3: hsl(173 58% 39%);
+    --chart-4: hsl(38 92% 50%);
+    --chart-5: hsl(340 82% 52%);
+
+    /* Semantik nominal (dipakai kartu KPI & chart cash flow) */
+    --income: hsl(152 62% 38%);
+    --expense: hsl(0 72% 51%);
+
+    /* Neumorphism */
+    --neu-light: hsl(0 0% 100%);
+    --neu-dark: hsl(214 30% 85%);
+    --neu-primary-light: hsl(221 100% 88%);
+    --neu-primary-dark: hsl(221 70% 45%);
+    --neu-accent-light: hsl(262 100% 90%);
+    --neu-accent-dark: hsl(262 52% 48%);
+
+    --radius: 0.75rem;
+
+    --sidebar-background: hsl(214 42% 96%);
+    --sidebar-foreground: hsl(222 47% 20%);
+    --sidebar-primary: hsl(221 83% 53%);
+    --sidebar-primary-foreground: hsl(0 0% 100%);
+    --sidebar-accent: hsl(214 40% 91%);
+    --sidebar-accent-foreground: hsl(222 47% 25%);
+    --sidebar-border: hsl(214 30% 89%);
+    --sidebar-ring: hsl(221 83% 53%);
+    --sidebar: hsl(214 42% 96%);
+}
+
+.dark {
+    --primary: hsl(221 90% 66%);
+    --primary-foreground: hsl(222 47% 8%);
+    --accent: hsl(262 90% 74%);
+    --accent-foreground: hsl(262 60% 12%);
+
+    --background: hsl(222 32% 9%);
+    --foreground: hsl(210 40% 96%);
+    --surface: hsl(222 32% 9%);
+    --surface-foreground: hsl(210 40% 96%);
+    --surface-muted: hsl(222 24% 15%);
+    --surface-muted-foreground: hsl(215 20% 72%);
+    --card: hsl(222 28% 12%);
+    --card-foreground: hsl(210 40% 96%);
+    --popover: hsl(222 28% 12%);
+    --popover-foreground: hsl(210 40% 96%);
+
+    --secondary: hsl(262 30% 20%);
+    --secondary-foreground: hsl(262 90% 88%);
+    --muted: hsl(222 24% 16%);
+    --muted-foreground: hsl(215 20% 72%);
+
+    --destructive: hsl(0 72% 58%);
+    --destructive-foreground: hsl(0 0% 100%);
+    --success: hsl(152 55% 48%);
+    --success-foreground: hsl(0 0% 100%);
+    --warning: hsl(38 90% 55%);
+    --warning-foreground: hsl(222 47% 8%);
+
+    --border: hsl(222 20% 20%);
+    --input: hsl(222 20% 22%);
+    --ring: hsl(221 90% 66%);
+
+    --chart-1: hsl(221 90% 66%);
+    --chart-2: hsl(262 90% 74%);
+    --chart-3: hsl(168 60% 50%);
+    --chart-4: hsl(38 90% 60%);
+    --chart-5: hsl(340 80% 65%);
+
+    --income: hsl(152 55% 48%);
+    --expense: hsl(0 72% 58%);
+
+    --neu-light: hsl(222 24% 18%);
+    --neu-dark: hsl(222 40% 6%);
+    --neu-primary-light: hsl(221 70% 40%);
+    --neu-primary-dark: hsl(222 45% 5%);
+    --neu-accent-light: hsl(262 60% 40%);
+    --neu-accent-dark: hsl(222 45% 5%);
+
+    --sidebar-background: hsl(222 30% 10%);
+    --sidebar-foreground: hsl(210 30% 92%);
+    --sidebar-primary: hsl(221 90% 66%);
+    --sidebar-primary-foreground: hsl(222 47% 8%);
+    --sidebar-accent: hsl(222 24% 18%);
+    --sidebar-accent-foreground: hsl(210 30% 92%);
+    --sidebar-border: hsl(222 20% 20%);
+    --sidebar-ring: hsl(221 90% 66%);
+    --sidebar: hsl(222 32% 9%);
+
+    --shadow-neu-flat:
+        -5px -5px 10px var(--neu-light), 5px 5px 10px var(--neu-dark);
+    --shadow-neu-flat-sm:
+        -3px -3px 6px var(--neu-light), 3px 3px 6px var(--neu-dark);
+    --shadow-neu-raised:
+        -9px -9px 20px var(--neu-light), 9px 9px 20px var(--neu-dark);
+    --shadow-neu-hover:
+        -7px -7px 15px var(--neu-light), 7px 7px 15px var(--neu-dark);
+    --shadow-neu-pressed:
+        inset -4px -4px 8px var(--neu-light), inset 4px 4px 8px var(--neu-dark);
+    --shadow-neu-pressed-sm:
+        inset -2px -2px 5px var(--neu-light), inset 2px 2px 5px var(--neu-dark);
+    --shadow-neu-inset:
+        inset 2px 2px 5px var(--neu-dark), inset -2px -2px 5px var(--neu-light);
+    --shadow-neu-primary:
+        -3px -3px 7px var(--neu-primary-light),
+        5px 5px 12px var(--neu-primary-dark);
+    --shadow-neu-accent:
+        -3px -3px 7px var(--neu-accent-light),
+        5px 5px 12px var(--neu-accent-dark);
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+}
+
+/*
+| Helper semantik — dipakai lintas modul agar tidak ada warna/shadow hardcode.
+*/
+@layer components {
+    .neu-card {
+        @apply bg-card text-card-foreground border border-border/60 shadow-neu-flat;
+    }
+
+    .neu-surface {
+        @apply bg-surface text-surface-foreground shadow-neu-flat;
+    }
+
+    .neu-inset {
+        @apply bg-surface shadow-neu-inset;
+    }
+
+    .neu-interactive {
+        @apply transition-[box-shadow,transform,color] duration-200 ease-out;
+    }
+}

@@ -1,0 +1,42 @@
+
+ INFO Server running on [http://127.0.0.1:8123]. 
+
+ Press Ctrl+C to stop the server
+
+ 2026-09-26 19:45:42 /login .. ~ 514.38ms
+ 2026-09-26 19:45:43 /up .. ~ 1dt
+ 2026-09-26 23:46:36 /login .. ~ 25dt
+ 2026-09-26 23:47:00 /up .. ~ 509.53ms
+ 2026-09-26 23:47:00 /build/assets/app-CcvVonco.css .. ~ 511.06ms
+ 2026-09-26 23:47:01 /build/assets/instrument-sans-400-normal-DRC__1Mx.woff2 .. ~ 0.86ms
+ 2026-09-26 23:47:01 /build/assets/instrument-sans-500-normal-Dk9ku72i.woff2 .. ~ 0.87ms
+ 2026-09-26 23:47:01 /build/assets/app-Ds1aFT64.css .. ~ 1.14ms
+ 2026-09-26 23:47:01 /build/assets/instrument-sans-600-normal-B7fBEWYG.woff2 .. ~ 506.29ms
+ 2026-09-26 23:47:01 /build/assets/app-XLfZhnzd.js .. ~ 506.63ms
+ 2026-09-26 23:47:01 /build/assets/Presence-DURLvQEb.js .. ~ 507.42ms
+ 2026-09-26 23:47:01 /build/assets/wayfinder-DpB5XR7E.js .. ~ 507.90ms
+ 2026-09-26 23:47:01 /build/assets/button-BzIEV6fr.js .. ~ 508.12ms
+ 2026-09-26 23:47:01 /build/assets/useForwardExpose-CPps_ile.js .. ~ 3.47ms
+ 2026-09-26 23:47:02 /build/assets/createLucideIcon-CUrw6VFA.js .. ~ 4.60ms
+ 2026-09-26 23:47:02 /build/assets/Login-B6FHF87a.js .. ~ 3.31ms
+ 2026-09-26 23:47:02 /build/assets/Label-BbZdCOTL.js .. ~ 3.84ms
+ 2026-09-26 23:47:02 /build/assets/check-CIPLZA_0.js .. ~ 2.93ms
+ 2026-09-26 23:47:02 /build/assets/PasswordInput-D0moaDvk.js .. ~ 2.35ms
+ 2026-09-26 23:47:02 /build/assets/InputError-C7cC2I9i.js .. ~ 2.27ms
+ 2026-09-26 23:47:02 /build/assets/Spinner-Bgl069A6.js .. ~ 2.50ms
+ 2026-09-26 23:47:02 /build/assets/PasskeyVerify-Dcs3XJZg.js .. ~ 3.08ms
+ 2026-09-26 23:47:02 /build/assets/vue-Cnqy33SM.js .. ~ 504.48ms
+ 2026-09-26 23:47:02 /build/assets/TextLink-2NFbceh_.js .. ~ 504.38ms
+ 2026-09-26 23:47:02 /build/assets/password-C9cKy8Zz.js .. ~ 503.92ms
+ 2026-09-26 23:47:02 /build/assets/confirm-DizpLSzj.js .. ~ 503.01ms
+ 2026-09-26 23:47:02 /favicon.ico .. ~ 502.43ms
+ 2026-09-26 23:47:02 /build/assets/instrument-sans-500-normal-Z6ESRlEs.woff .. ~ 0.04ms
+ 2026-09-26 23:47:02 /build/assets/instrument-sans-400-normal-D1W7dsQl.woff .. ~ 0.23ms
+ 2026-09-26 23:49:24 /passkeys/login/options .. ~ 4dt
+ 2026-09-26 23:49:37 /register .. ~ 1dt
+ 2026-09-26 23:49:37 /build/assets/Register-BpITmT6y.js .. ~ 0.05ms
+ 2026-09-26 23:50:06 /register .. ~ 14dt
+ 2026-09-26 23:50:21 /dashboard .. ~ 1dt
+ 2026-09-26 23:50:21 /email/verify .. ~ 511.59ms
+ 2026-09-26 23:50:22 /build/assets/VerifyEmail-CHY1lodT.js .. ~ 509.68ms
+ 2026-09-26 23:50:22 /build/assets/verification-BhJxK8FA.js .. ~ 0.99ms
