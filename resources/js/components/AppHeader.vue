@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Menu, Search } from '@lucide/vue';
+import {
+    BookOpen,
+    Building2,
+    Folder,
+    LayoutGrid,
+    Menu,
+    Search,
+} from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
@@ -32,10 +39,12 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import UserMenuContent from '@/components/UserMenuContent.vue';
+import WorkspaceSwitcher from '@/components/WorkspaceSwitcher.vue';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { getInitials } from '@/composables/useInitials';
 import { toUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
+import { index as workspacesIndex } from '@/routes/workspaces';
 import type { BreadcrumbItem, NavItem } from '@/types';
 
 type Props = {
@@ -123,6 +132,19 @@ const rightNavItems: NavItem[] = [
                                         />
                                         {{ item.title }}
                                     </Link>
+                                    <Link
+                                        :href="workspacesIndex().url"
+                                        class="flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent"
+                                        :class="
+                                            whenCurrentUrl(
+                                                workspacesIndex().url,
+                                                activeItemStyles,
+                                            )
+                                        "
+                                    >
+                                        <Building2 class="h-5 w-5" />
+                                        Pilih workspace
+                                    </Link>
                                 </nav>
                                 <div class="flex flex-col space-y-4">
                                     <a
@@ -149,6 +171,11 @@ const rightNavItems: NavItem[] = [
                 <Link :href="dashboard()" class="flex items-center gap-x-2">
                     <AppLogo />
                 </Link>
+
+                <!-- Workspace Switcher -->
+                <div class="ml-4 hidden md:block">
+                    <WorkspaceSwitcher />
+                </div>
 
                 <!-- Desktop Menu -->
                 <div class="hidden h-full lg:flex lg:flex-1">

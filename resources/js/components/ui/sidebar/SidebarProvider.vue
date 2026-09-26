@@ -17,6 +17,7 @@ const props = withDefaults(defineProps<{
 
 const emits = defineEmits<{
   "update:open": [open: boolean]
+  "open-change": [open: boolean]
 }>()
 
 const isMobile = useMediaQuery("(max-width: 768px)")
@@ -32,6 +33,9 @@ function setOpen(value: boolean) {
 
   // This sets the cookie to keep the sidebar state.
   document.cookie = `${SIDEBAR_COOKIE_NAME}=${open.value}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+
+  // Lets the layout persist the preference (localStorage + users.sidebar_collapsed).
+  emits("open-change", value)
 }
 
 function setOpenMobile(value: boolean) {

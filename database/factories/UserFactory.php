@@ -2,7 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Enums\WorkspaceRole;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -56,5 +58,25 @@ class UserFactory extends Factory
             'two_factor_recovery_codes' => encrypt(json_encode(['recovery-code-1'])),
             'two_factor_confirmed_at' => now(),
         ]);
+    }
+
+    /**
+     * Sertakan satu workspace yang dimiliki user ini.
+     *
+     * Sengaja opt-in: user tanpa workspace harus tetap bisa diuji agar guard
+     * `workspace.selected` dan tenant isolation ikut terverifikasi.
+     */
+    public function withWorkspace(
+        ?string $name = null,
+        WorkspaceRole $role = WorkspaceRole::Owner,
+    ): static {
+        return $this->afterCreating(function (User $user) use ($name, $role): void {
+            $workspace = Workspace::factory()->create([
+                'name' => $name ?? 'Buku Utama',
+                'owner_id' => $user->getKey(),
+            ]);
+
+            $workspace->addUser($user, $role);
+        });
     }
 }
