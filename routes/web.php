@@ -2,8 +2,10 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\RecurringRuleController;
 use App\Http\Controllers\Settings\SidebarPreferenceController;
 use App\Http\Controllers\TagController;
+use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
@@ -51,6 +53,40 @@ Route::middleware(['auth', 'verified', 'workspace.selected'])->group(function ()
     Route::post('tags', [TagController::class, 'store'])->name('tags.store');
     Route::put('tags/{tag}', [TagController::class, 'update'])->name('tags.update');
     Route::delete('tags/{tag}', [TagController::class, 'destroy'])->name('tags.destroy');
+
+    /*
+    |----------------------------------------------------------------------
+    | Transaksi (Fase 3)
+    |----------------------------------------------------------------------
+    | `store`/`update`/`destroy` menyentuh `accounts.cached_balance`, jadi
+    | keduanya hanya lewat TransactionManager (DB transaction) dan butuh
+    | ability `editData` — viewer melihat daftar, tapi tidak bisa menulis.
+    */
+    Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');
+    Route::get('transactions/create', [TransactionController::class, 'create'])->name('transactions.create');
+    Route::post('transactions', [TransactionController::class, 'store'])->name('transactions.store');
+    Route::get('transactions/{transaction}/edit', [TransactionController::class, 'edit'])->name('transactions.edit');
+    Route::put('transactions/{transaction}', [TransactionController::class, 'update'])->name('transactions.update');
+    Route::delete('transactions/{transaction}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
+
+    // Instance transaksi berulang yang menunggu konfirmasi.
+    Route::post('transactions/{transaction}/confirm', [TransactionController::class, 'confirm'])->name('transactions.confirm');
+    Route::post('transactions/{transaction}/discard', [TransactionController::class, 'discard'])->name('transactions.discard');
+
+    // Lampiran bukti: unduh lewat controller supaya tenant scope ikut berlaku.
+    Route::get('attachments/{attachment}', [TransactionController::class, 'download'])->name('transactions.attachments.download');
+
+    /*
+    |----------------------------------------------------------------------
+    | Transaksi berulang (Fase 3)
+    |----------------------------------------------------------------------
+    | Rule tidak pernah dihapus: nonaktif berarti `is_active = false` supaya
+    | histori instance tetap punya induk yang jelas.
+    */
+    Route::get('recurring-rules', [RecurringRuleController::class, 'index'])->name('recurring-rules.index');
+    Route::post('recurring-rules', [RecurringRuleController::class, 'store'])->name('recurring-rules.store');
+    Route::put('recurring-rules/{recurring_rule}', [RecurringRuleController::class, 'update'])->name('recurring-rules.update');
+    Route::post('recurring-rules/{recurring_rule}/toggle', [RecurringRuleController::class, 'toggle'])->name('recurring-rules.toggle');
 });
 
 require __DIR__.'/settings.php';

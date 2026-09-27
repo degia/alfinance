@@ -5,9 +5,11 @@ import {
     Building2,
     FolderGit2,
     LayoutGrid,
+    Repeat,
     Shapes,
     Tags,
     Wallet,
+    ArrowLeftRight,
 } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
@@ -25,7 +27,9 @@ import {
 import { dashboard } from '@/routes';
 import { index as accountsIndex } from '@/routes/accounts';
 import { index as categoriesIndex } from '@/routes/categories';
+import { index as recurringRulesIndex } from '@/routes/recurring-rules';
 import { index as tagsIndex } from '@/routes/tags';
+import { index as transactionsIndex } from '@/routes/transactions';
 import { index as workspacesIndex } from '@/routes/workspaces';
 import type { NavItem } from '@/types';
 
@@ -34,6 +38,16 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Transaksi',
+        href: transactionsIndex(),
+        icon: ArrowLeftRight,
+    },
+    {
+        title: 'Transaksi berulang',
+        href: recurringRulesIndex(),
+        icon: Repeat,
     },
     {
         title: 'Akun',

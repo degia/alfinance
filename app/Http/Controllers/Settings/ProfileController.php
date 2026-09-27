@@ -30,13 +30,31 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $user = $request->user();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        $user->fill($request->validated());
+
+        $emailChanged = $user->isDirty('email');
+
+        if ($emailChanged) {
+            $user->email_verified_at = null;
         }
 
-        $request->user()->save();
+        $user->save();
+
+        // Email baru wajib diverifikasi ulang, jadi notifikasi harus ikut
+        // terkirim. Tanpa ini user terkunci di /email/verify tanpa pernah
+        // menerima link, karena middleware `verified` menolak semua route.
+        if ($emailChanged && $user instanceof MustVerifyEmail) {
+            $user->sendEmailVerificationNotification();
+
+            Inertia::flash('toast', [
+                'type' => 'success',
+                'message' => __('Profile updated. Verification link sent to your new email address.'),
+            ]);
+
+            return to_route('profile.edit');
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Profile updated.')]);
 

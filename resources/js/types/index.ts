@@ -3,5 +3,6 @@ export * from './auth';
 export * from './category';
 export * from './navigation';
 export * from './tag';
+export * from './transaction';
 export * from './ui';
 export * from './workspace';

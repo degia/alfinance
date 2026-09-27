@@ -3,7 +3,9 @@
 namespace Tests\Feature\Settings;
 
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class ProfileUpdateTest extends TestCase
@@ -45,6 +47,8 @@ class ProfileUpdateTest extends TestCase
 
     public function test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged()
     {
+        Notification::fake();
+
         $user = User::factory()->create();
 
         $response = $this
@@ -59,6 +63,34 @@ class ProfileUpdateTest extends TestCase
             ->assertRedirect(route('profile.edit'));
 
         $this->assertNotNull($user->refresh()->email_verified_at);
+
+        Notification::assertNothingSent();
+    }
+
+    public function test_a_new_verification_link_is_sent_when_the_email_address_changes()
+    {
+        Notification::fake();
+
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch(route('profile.update'), [
+                'name' => $user->name,
+                'email' => 'baru@example.com',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('profile.edit'));
+
+        $user->refresh();
+
+        $this->assertSame('baru@example.com', $user->email);
+        $this->assertNull($user->email_verified_at);
+
+        // Tanpa notifikasi ini user terkunci di /email/verify tanpa link.
+        Notification::assertSentTo($user, VerifyEmail::class);
     }
 
     public function test_user_can_delete_their_account()
