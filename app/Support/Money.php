@@ -107,4 +107,61 @@ final class Money
 
         return round(min(max($perMille / 10, 0), 100), 1);
     }
+
+    /**
+     * Persentase tanpa batas atas — dipakai budget & pelunasan, yang
+     * legitimately melewati 100% dan justru harus terlihat di UI.
+     *
+     * Hasil dibulatkan ke satu desimal lewat satu operasi `/10` (dari per
+     * mille) supaya tidak ada error pembulatan di tengah. `whole` negatif
+     * tetap dihitung dengan tanda yang benar; nol mengembalikan null.
+     */
+    public static function ratioOf(string|int|null $part, string|int|null $whole): ?float
+    {
+        $wholeCents = self::toCents($whole);
+
+        if ($wholeCents === 0) {
+            return null;
+        }
+
+        $perMille = intdiv(self::toCents($part) * 1000 + intdiv($wholeCents, 2), $wholeCents);
+
+        return round($perMille / 10, 1);
+    }
+
+    /**
+     * Jumlahkan seluruh nominal dan format sebagai string desimal.
+     *
+     * Dipakai untuk menjumlahkan baris agregat (dipakai di budget progress &
+     * snapshot net worth) tanpa melewati float.
+     *
+     * @param  iterable<string|int|null>  $values
+     */
+    public static function sum(iterable $values): string
+    {
+        $total = 0;
+
+        foreach ($values as $value) {
+            $total += self::toCents($value);
+        }
+
+        return self::fromCents($total);
+    }
+
+    /**
+     * Normalkan hasil `SUM()` database menjadi nominal dua desimal.
+     *
+     * Driver berbeda mengembalikan hasil agregat `DECIMAL` dengan tipe yang
+     * berbeda-beda, dan pembacaanya mudah salah: hasilnya masih dalam satuan
+     * rupiah, BUKAN sen. Semua pemanggil `SUM()` wajib lewat helper ini
+     * supaya tidak ada yang salah mengira satuan hasilnya.
+     *
+     * Karena kolom `DECIMAL` selalu dikembalikan sebagai string desimal, nilai
+     * yang sudah benar tidak pernah melewati float. Konversi ke string hanya
+     * menutup kasus driver lain yang mengembalikan int.
+     */
+    public static function fromDatabaseSum(mixed $total): string
+    {
+        return self::fromCents(self::toCents(is_scalar($total) ? (string) $total : '0'));
+    }
 }

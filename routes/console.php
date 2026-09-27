@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\CloseMonthlyNetWorthSnapshotsJob;
 use App\Jobs\RecurringTransactionJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -20,3 +21,16 @@ Artisan::command('inspire', function () {
 | menentukan tanggal transaksi.
 */
 Schedule::job(new RecurringTransactionJob)->dailyAt('00:10')->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Net worth (Fase 4)
+|--------------------------------------------------------------------------
+| Tanggal 1 pukul 00:20 bulan yang baru ditutup ditulis sebagai snapshot
+| final, supaya tren punya titik yang tidak berubah lagi. Snapshot bulan
+| berjalan dijaga listener, bukan scheduler, karena bisa berubah kapan saja.
+|
+| Dijadwalkan 00:20 (bukan 00:00/00:10) supaya tidak berebut antrean dengan
+| instance transaksi berulang di 00:10 — keduanya menyalakan worker.
+*/
+Schedule::job(new CloseMonthlyNetWorthSnapshotsJob)->dailyAt('00:20')->withoutOverlapping();

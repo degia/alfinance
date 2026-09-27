@@ -10,6 +10,9 @@ import {
     Tags,
     Wallet,
     ArrowLeftRight,
+    HandCoins,
+    Target,
+    TrendingUp,
 } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
@@ -26,7 +29,10 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as accountsIndex } from '@/routes/accounts';
+import { index as budgetsIndex } from '@/routes/budgets';
 import { index as categoriesIndex } from '@/routes/categories';
+import { index as debtsIndex } from '@/routes/debts';
+import { index as netWorthIndex } from '@/routes/net-worth';
 import { index as recurringRulesIndex } from '@/routes/recurring-rules';
 import { index as tagsIndex } from '@/routes/tags';
 import { index as transactionsIndex } from '@/routes/transactions';
@@ -53,6 +59,21 @@ const mainNavItems: NavItem[] = [
         title: 'Akun',
         href: accountsIndex(),
         icon: Wallet,
+    },
+    {
+        title: 'Anggaran',
+        href: budgetsIndex(),
+        icon: Target,
+    },
+    {
+        title: 'Net worth',
+        href: netWorthIndex(),
+        icon: TrendingUp,
+    },
+    {
+        title: 'Utang & piutang',
+        href: debtsIndex(),
+        icon: HandCoins,
     },
     {
         title: 'Kategori',

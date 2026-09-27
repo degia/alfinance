@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\DebtController;
+use App\Http\Controllers\NetWorthController;
 use App\Http\Controllers\RecurringRuleController;
 use App\Http\Controllers\Settings\SidebarPreferenceController;
 use App\Http\Controllers\TagController;
@@ -87,6 +90,49 @@ Route::middleware(['auth', 'verified', 'workspace.selected'])->group(function ()
     Route::post('recurring-rules', [RecurringRuleController::class, 'store'])->name('recurring-rules.store');
     Route::put('recurring-rules/{recurring_rule}', [RecurringRuleController::class, 'update'])->name('recurring-rules.update');
     Route::post('recurring-rules/{recurring_rule}/toggle', [RecurringRuleController::class, 'toggle'])->name('recurring-rules.toggle');
+
+    /*
+    |----------------------------------------------------------------------
+    | Anggaran (Fase 4)
+    |----------------------------------------------------------------------
+    | Limit per kategori per bulan. Halaman ini membaca
+    | `budget_progress_cache`, jadi `store`/`update`/`destroy` hanya menulis
+    | limit + cache lewat BudgetService (DB transaction) dan butuh ability
+    | `editData`.
+    */
+    Route::get('budgets', [BudgetController::class, 'index'])->name('budgets.index');
+    Route::post('budgets', [BudgetController::class, 'store'])->name('budgets.store');
+    Route::put('budgets/{budget}', [BudgetController::class, 'update'])->name('budgets.update');
+    Route::delete('budgets/{budget}', [BudgetController::class, 'destroy'])->name('budgets.destroy');
+
+    /*
+    |----------------------------------------------------------------------
+    | Net worth (Fase 4)
+    |----------------------------------------------------------------------
+    | Item aset/kewajiban manual. Tren diambil dari `net_worth_snapshots`
+    | (ditulis job terjadwal), bukan dari agregasi transaksi per request.
+    */
+    Route::get('net-worth', [NetWorthController::class, 'index'])->name('net-worth.index');
+    Route::post('net-worth/items', [NetWorthController::class, 'store'])->name('net-worth.store');
+    Route::put('net-worth/items/{net_worth_item}', [NetWorthController::class, 'update'])->name('net-worth.update');
+    Route::delete('net-worth/items/{net_worth_item}', [NetWorthController::class, 'destroy'])->name('net-worth.destroy');
+
+    /*
+    |----------------------------------------------------------------------
+    | Utang & piutang (Fase 4)
+    |----------------------------------------------------------------------
+    | Utang yang sudah punya riwayat pembayaran tidak bisa dihapus; status
+    | `settled` yang menutupnya. `payments` boleh membuat expense/income di
+    | modul Transaksi lewat TransactionManager.
+    */
+    Route::get('debts', [DebtController::class, 'index'])->name('debts.index');
+    Route::get('debts/create', [DebtController::class, 'create'])->name('debts.create');
+    Route::post('debts', [DebtController::class, 'store'])->name('debts.store');
+    Route::get('debts/{debt}', [DebtController::class, 'show'])->name('debts.show');
+    Route::get('debts/{debt}/edit', [DebtController::class, 'edit'])->name('debts.edit');
+    Route::put('debts/{debt}', [DebtController::class, 'update'])->name('debts.update');
+    Route::post('debts/{debt}/payments', [DebtController::class, 'recordPayment'])->name('debts.payments.store');
+    Route::delete('debts/{debt}', [DebtController::class, 'destroy'])->name('debts.destroy');
 });
 
 require __DIR__.'/settings.php';

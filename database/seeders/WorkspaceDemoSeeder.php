@@ -117,7 +117,12 @@ class WorkspaceDemoSeeder extends Seeder
         $transfers = [
             ['from' => 'bank', 'to' => 'cash', 'amount' => '500000.00', 'note' => 'Tarik tunai', 'day' => 7],
             ['from' => 'bank', 'to' => 'ewallet', 'amount' => '1000000.00', 'note' => 'Top up e-wallet', 'day' => 15],
-            ['from' => 'bank', 'to' => 'card', 'amount' => '2000000.00', 'note' => 'Bayar tagihan kartu', 'day' => 25],
+            // Transfer ke kartu kredit berarti membayar tagihannya: saldo kartu
+            // (yang negatif = utang) naik mendekati nol. Nominalnya 1.000.000
+            // supaya dari 1.128.000 belanja kartu tersisa 128.000 outstanding —
+            // angka yang membuat kartu terlihat benar-benar punya utang, bukan
+            // saldo lebih.
+            ['from' => 'bank', 'to' => 'card', 'amount' => '1000000.00', 'note' => 'Bayar tagihan kartu', 'day' => 25],
         ];
 
         foreach ($rows as $row) {
