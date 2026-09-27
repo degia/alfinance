@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('name');
 
             // Saldo awal yang diinput user; cached_balance disalin dari sini
-            // dan 이후 di-maintain oleh listener transaksi (Fase 3).
+            // dan — di-maintain oleh listener transaksi (Fase 3).
             $table->decimal('initial_balance', 15, 2)->default(0);
             $table->decimal('cached_balance', 15, 2)->default(0);
 

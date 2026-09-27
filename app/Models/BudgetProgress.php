@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * request — jadi halaman hanya melakukan `SELECT`, tidak pernah
  * `SUM()` ke tabel `transactions`.
  *
- * `used_amount` sengaja počong nol: kategori tanpa transaksiapo belum punya
+ * `used_amount` sengaja pocong nol: kategori tanpa transaksi apa pun belum punya
  * baris, dan itu sama artinya dengan nol terpakai.
  *
  * @property int $id

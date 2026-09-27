@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\AccountUpdated;
 use App\Http\Controllers\Concerns\AuthorizesWorkspaceData;
 use App\Http\Requests\AccountRequest;
 use App\Models\Account;
@@ -53,6 +54,8 @@ class AccountController extends Controller
         $account->cached_balance = $attributes['initial_balance'];
         $account->save();
 
+        AccountUpdated::dispatch($account, 'created', $request->user()?->id);
+
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => __('Akun :name berhasil ditambahkan.', ['name' => $account->name]),
@@ -76,8 +79,10 @@ class AccountController extends Controller
                 Money::subtract($attributes['initial_balance'], $account->initial_balance),
             );
         }
-
         $account->fill($attributes)->save();
+
+        AccountUpdated::dispatch($account, 'updated', $request->user()?->id);
+
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => __('Akun :name berhasil diperbarui.', ['name' => $account->name]),
@@ -95,6 +100,8 @@ class AccountController extends Controller
         $this->authorizeEditData();
 
         $account->archive();
+
+        AccountUpdated::dispatch($account, 'archived', $request->user()?->id);
 
         Inertia::flash('toast', [
             'type' => 'success',
