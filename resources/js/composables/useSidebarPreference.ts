@@ -1,4 +1,4 @@
-import { router, usePage } from '@inertiajs/vue3';
+import { usePage } from '@inertiajs/vue3';
 import { useDebounceFn } from '@vueuse/core';
 import type { ComputedRef, Ref } from 'vue';
 import { computed, ref } from 'vue';
@@ -48,6 +48,20 @@ function writeStoredPreference(collapsed: boolean): void {
 }
 
 /**
+ * Token CSRF dari root view untuk request non-Inertia.
+ */
+function csrfToken(): string {
+    if (typeof document === 'undefined') {
+        return '';
+    }
+
+    return (
+        document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+            ?.content ?? ''
+    );
+}
+
+/**
  * Nilai terakhir yang tersimpan di server, dipakai agar request tidak dikirim
  * ulang untuk nilai yang sama.
  */
@@ -67,16 +81,29 @@ export function useSidebarPreference(): UseSidebarPreferenceReturn {
     const persist = useDebounceFn((value: boolean) => {
         lastPersisted = value;
 
-        router.post(
-            sidebar(),
-            { collapsed: value },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                // Request ringan: tidak boleh memicu render ulang halaman.
-                async: true,
+        /*
+         * `POST settings/sidebar` sengaja membalas JSON biasa, bukan Inertia
+         * response, supaya tidak memicu render ulang halaman. Karena itu
+         * request-nya HARUS lewat `fetch`: kalau dikirim dengan `router.post`,
+         * Inertia mengharapkan response Inertia dan melempar "All Inertia
+         * requests must receive a valid Inertia response".
+         */
+        void fetch(sidebar.url(), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken(),
             },
-        );
+            body: JSON.stringify({ collapsed: value }),
+            // Kalau navigasi menyusul, request tetap terkirim.
+            keepalive: true,
+        }).catch(() => {
+            // Preferensi ini hanya memengaruhi tampilan; localStorage sudah
+            // menyimpan nilainya, jadi kegagalan sinkronisasi diabaikan.
+        });
     }, SIDEBAR_PERSIST_DEBOUNCE_MS);
 
     function setOpen(open: boolean): void {
