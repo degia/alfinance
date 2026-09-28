@@ -2,6 +2,7 @@
 
 use App\Jobs\CloseMonthlyNetWorthSnapshotsJob;
 use App\Jobs\RecurringTransactionJob;
+use App\Jobs\RefreshWorkspaceAggregatesJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -34,3 +35,16 @@ Schedule::job(new RecurringTransactionJob)->dailyAt('00:10')->withoutOverlapping
 | instance transaksi berulang di 00:10 — keduanya menyalakan worker.
 */
 Schedule::job(new CloseMonthlyNetWorthSnapshotsJob)->dailyAt('00:20')->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Agregat dashboard & kesehatan finansial (Fase 5)
+|--------------------------------------------------------------------------
+| Transaksi, anggaran, akun, dan pembayaran utang sudah memicu build ulang
+| lewat listener + job antrean. Penjadwalan ini jaring pengaman: menutup bulan
+| yang snapshot-nya belum pernah dibuat (workspace baru, data hasil migrasi).
+|
+| Pukul 00:35 supaya berjalan setelah job 00:10 (transaksi berulang) dan
+| 00:20 (snapshot net worth), tidak berebut antrean dengan keduanya.
+*/
+Schedule::job(new RefreshWorkspaceAggregatesJob)->dailyAt('00:35')->withoutOverlapping();

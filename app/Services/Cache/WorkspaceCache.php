@@ -88,7 +88,6 @@ class WorkspaceCache
      * @template TValue
      *
      * @param  Closure(): TValue  $callback
-     * @param  int|null  $ttl
      * @return TValue
      */
     public function remember(
@@ -145,7 +144,9 @@ class WorkspaceCache
             $keys = (array) $redis->smembers($indexKey);
 
             foreach (array_chunk($keys, self::DELETE_CHUNK) as $chunk) {
-                Cache::deleteMany($chunk);
+                foreach ($chunk as $key) {
+                    Cache::forget($key);
+                }
             }
 
             $redis->del($indexKey);

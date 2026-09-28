@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\RecomputeDashboardSnapshotJob;
 use App\Support\Money;
 use App\Support\MonthPeriod;
 use Carbon\CarbonImmutable;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * Rekap arus kas bulanan (ARCHITECTURE.md §2.3 butir 3, PRD.md §3.1).
  *
  * Satu baris per workspace per bulan, ditulis
- * {@see \App\Jobs\RecomputeDashboardSnapshotJob} dari antrean. Dashboard dan
+ * {@see RecomputeDashboardSnapshotJob} dari antrean. Dashboard dan
  * laporan arus kas membaca tabel ini — tidak pernah menjumlahkan `transactions`
  * di jalur request.
  *

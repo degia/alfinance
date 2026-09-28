@@ -3,8 +3,10 @@
 namespace App\Services\Dashboard;
 
 use App\Enums\TransactionType;
+use App\Jobs\RecomputeDashboardSnapshotJob;
 use App\Models\DashboardSnapshot;
 use App\Models\Transaction;
+use App\Services\Budgets\BudgetService;
 use App\Support\Money;
 use App\Support\MonthPeriod;
 use Carbon\CarbonImmutable;
@@ -15,11 +17,11 @@ use Illuminate\Support\Facades\DB;
  * (ARCHITECTURE.md §2.3 butir 3, PRD.md §3.1).
  *
  * Ini satu-satunya tempat yang menjumlahkan `transactions` untuk kebutuhan
- * dashboard, dan ia hanya berjalan di dalam {@see \App\Jobs\RecomputeDashboardSnapshotJob}
+ * dashboard, dan ia hanya berjalan di dalam {@see RecomputeDashboardSnapshotJob}
  * — bukan di jalur request. Pembacaan dashboard memakai
  * {@see DashboardService} yang hanya membaca tabel ini lewat cache.
  *
- * Mirip {@see \App\Services\Budgets\BudgetService::recomputeForMonth()}:
+ * Mirip {@see BudgetService::recomputeForMonth()}:
  * - Idempoten. Hasilnya turunan penuh dari transaksi bulan itu, jadi menjalankan
  *   berkali-kali berakhir pada baris yang sama.
  * - Tidak memakai `ActiveWorkspace`, karena dipanggil dari job/console tanpa

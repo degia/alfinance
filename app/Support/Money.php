@@ -164,4 +164,26 @@ final class Money
     {
         return self::fromCents(self::toCents(is_scalar($total) ? (string) $total : '0'));
     }
+
+    /**
+     * Format nominal untuk teks server-side: `Rp1.500.000`.
+     *
+     * Halaman Inertia memformat nominal sendiri di `resources/js/lib/format.ts`
+     * (id-ID, tanpa desimal currency — PRD.md §6). Helper ini hanya untuk
+     * kalimat yang server yang menyusun, mis. rekomendasi financial health,
+     * dan Lembar export. Bentuknya sengaja sama dengan `Intl.NumberFormat`
+     * di frontend supaya angka yang tampil di pesan dan di tabel tidak
+     * berbeda format.
+     */
+    public static function format(string|int|null $value, bool $withPrefix = true): string
+    {
+        $cents = self::toCents($value);
+        $sign = $cents < 0 ? '-' : '';
+        // Pembulatan ke rupiah penuh, bukan ke sen: nilai satu rupiah tidak
+        // pernah jadi pesan, dan nominal satu sen tidak mungkin tampil sebagai
+        // "Rp0" lalu membingungkan.
+        $rounded = (int) round($cents / 100);
+
+        return ($withPrefix ? 'Rp' : '').$sign.number_format(abs($rounded), 0, ',', '.');
+    }
 }

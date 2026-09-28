@@ -117,6 +117,8 @@ class AccountController extends Controller
 
         $account->restore();
 
+        AccountUpdated::dispatch($account, 'restored', $request->user()?->id);
+
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => __('Akun :name dipulihkan.', ['name' => $account->name]),

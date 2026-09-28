@@ -6,6 +6,7 @@ use App\Models\DashboardSnapshot;
 use App\Models\Workspace;
 use App\Support\Money;
 use App\Support\MonthPeriod;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -57,7 +58,7 @@ class DashboardSnapshotFactory extends Factory
         ]);
     }
 
-    public function generatedAt(?\Carbon\CarbonImmutable $at = null): static
+    public function generatedAt(?CarbonImmutable $at = null): static
     {
         return $this->state(fn (): array => [
             'generated_at' => $at ?? now(),

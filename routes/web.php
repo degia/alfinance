@@ -3,9 +3,11 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DebtController;
 use App\Http\Controllers\NetWorthController;
 use App\Http\Controllers\RecurringRuleController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\Settings\SidebarPreferenceController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\TransactionController;
@@ -32,7 +34,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 Route::middleware(['auth', 'verified', 'workspace.selected'])->group(function () {
-    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+    /*
+    |----------------------------------------------------------------------
+    | Dashboard (Fase 5)
+    |----------------------------------------------------------------------
+    | Halaman ini dibaca dari cache + `dashboard_snapshots`, jadi tidak ada
+    | agregasi `transactions` di jalur request (ARCHITECTURE.md §2.1).
+    | Query `month`/`trend` hanya memilih potongan mana yang ditampilkan.
+    */
+    Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    /*
+    |----------------------------------------------------------------------
+    | Laporan (Fase 5)
+    |----------------------------------------------------------------------
+    | Satu halaman ber-tab: Cash Flow Statement, Budget vs Actual, Expense
+    | Breakdown. Rentang tanggal masuk ke cache key, jadi ganti filter tidak
+    | memicu recompute manual.
+    */
+    Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
 
     /*
     |----------------------------------------------------------------------

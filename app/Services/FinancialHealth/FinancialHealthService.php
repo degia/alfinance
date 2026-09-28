@@ -165,9 +165,12 @@ class FinancialHealthService
             $record->month = $month;
         }
 
-        $record->savings_rate = $savingsRate;
-        $record->dti = $dti;
-        $record->emergency_fund_months = $emergencyMonths;
+        // Kolom `DECIMAL(5,2)` dibaca model sebagai string lewat cast
+        // `decimal:2`; menyimpan float mentah akan menambahkan presisi
+        // kesepuluh yang tidak ada di kolom dan tidak pernah ditampilkan.
+        $record->savings_rate = $this->decimal($savingsRate);
+        $record->dti = $this->decimal($dti);
+        $record->emergency_fund_months = $this->decimal($emergencyMonths);
         $record->score = $score;
         $record->label = FinancialHealthLabel::fromScore($score);
         $record->recommendations = $recommendations;
@@ -182,6 +185,14 @@ class FinancialHealthService
      | Komponen metrik
      |--------------------------------------------------------------------------
      */
+
+    /**
+     * Bentuk nilai yang bisa langsung disimpan ke kolom `DECIMAL(5,2)`.
+     */
+    private function decimal(?float $value): ?string
+    {
+        return $value === null ? null : number_format($value, 2, '.', '');
+    }
 
     /**
      * (Income − Expense) / Income dalam persen, atau null saat belum ada
@@ -366,7 +377,7 @@ class FinancialHealthService
         }
 
         return match (true) {
-            $months >= self::TARGET_EMERGENCY_MIN => self::WEIGHT_EMERGENCY,
+            $months >= self::TARGET_EMERGENCY_MONTHS => self::WEIGHT_EMERGENCY,
             $months >= 1.0 => 22,
             $months > 0.0 => 12,
             default => 0,
@@ -381,7 +392,6 @@ class FinancialHealthService
      * yang sama dengan skornya, jadi pesannya bisa dipertanggungjawabkan dan
      * tidak berubah antar request.
      *
-     * @param  array<string, mixed>  $metrics
      * @return array<int, array{metric: string, message: string}>
      */
     private function recommendations(
@@ -425,7 +435,7 @@ class FinancialHealthService
                 'metric' => 'emergency_fund',
                 'message' => 'Belum ada data expense bulanan, jadi dana darurat belum bisa dihitung.',
             ];
-        } elseif ($emergencyMonths < self::TARGET_EMERGENCY_MIN) {
+        } elseif ($emergencyMonths < self::TARGET_EMERGENCY_MONTHS) {
             $recommendations[] = [
                 'metric' => 'emergency_fund',
                 'message' => $this->emergencyMessage($emergencyMonths, $liquidCents, $averageExpenseCents),
@@ -480,7 +490,7 @@ class FinancialHealthService
         return $headline.sprintf(
             ' Coba kurangi pos %s sebesar %s per bulan.',
             $top['name'],
-            'Rp '.number_format(min($gapCents, $top['cents']) / 100, 0, ',', '.'),
+            Money::format(Money::fromCents(min($gapCents, $top['cents']))),
         );
     }
 
@@ -492,14 +502,14 @@ class FinancialHealthService
         $headline = sprintf(
             'Dana darurat %.1f bulan masih di bawah %.0f bulan.',
             $months,
-            self::TARGET_EMERGENCY_MIN,
+            self::TARGET_EMERGENCY_MONTHS,
         );
 
         if ($averageExpenseCents <= 0) {
             return $headline.' Sisihkan sebagian pemasukan ke akun terpisah.';
         }
 
-        $targetCents = (int) round($averageExpenseCents * self::TARGET_EMERGENCY_MIN);
+        $targetCents = (int) round($averageExpenseCents * self::TARGET_EMERGENCY_MONTHS);
         $gapCents = max(0, $targetCents - $liquidCents);
 
         if ($gapCents === 0) {
@@ -508,7 +518,7 @@ class FinancialHealthService
 
         return $headline.sprintf(
             ' Sisihkan %s lagi agar aman.',
-            'Rp '.number_format($gapCents / 100, 0, ',', '.'),
+            Money::format(Money::fromCents($gapCents)),
         );
     }
 
@@ -523,10 +533,13 @@ class FinancialHealthService
      */
     private function topExpenseCategory(int $workspaceId, CarbonImmutable $month): ?array
     {
+        // `toBase()`: nama kategori diambil langsung dari join, bukan lewat
+        // relasi `category` yang akan menambah satu query lain.
         $row = BudgetProgress::allWorkspaces()
+            ->toBase()
             ->select([
-                'budget_progress_cache.category_id',
                 'budget_progress_cache.used_amount',
+                'categories.name as category_name',
             ])
             ->join('categories', 'categories.id', '=', 'budget_progress_cache.category_id')
             ->where('categories.workspace_id', $workspaceId)
@@ -540,14 +553,8 @@ class FinancialHealthService
             return null;
         }
 
-        $category = $row->category;
-
-        if ($category === null) {
-            return null;
-        }
-
         return [
-            'name' => $category->name,
+            'name' => (string) $row->category_name,
             'cents' => Money::toCents($row->used_amount),
         ];
     }
@@ -592,9 +599,9 @@ class FinancialHealthService
                 'key' => 'emergency_fund_months',
                 'label' => 'Dana darurat',
                 'value' => $emergency === null ? null : number_format($emergency, 1),
-                'target' => self::TARGET_EMERGENCY_MIN,
+                'target' => self::TARGET_EMERGENCY_MONTHS,
                 'unit' => 'months',
-                'is_healthy' => $emergency !== null && $emergency >= self::TARGET_EMERGENCY_MIN,
+                'is_healthy' => $emergency !== null && $emergency >= self::TARGET_EMERGENCY_MONTHS,
             ],
         ];
     }

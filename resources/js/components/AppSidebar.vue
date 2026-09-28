@@ -3,6 +3,7 @@ import { Link } from '@inertiajs/vue3';
 import {
     BookOpen,
     Building2,
+    FileBarChart,
     FolderGit2,
     LayoutGrid,
     Repeat,
@@ -34,6 +35,7 @@ import { index as categoriesIndex } from '@/routes/categories';
 import { index as debtsIndex } from '@/routes/debts';
 import { index as netWorthIndex } from '@/routes/net-worth';
 import { index as recurringRulesIndex } from '@/routes/recurring-rules';
+import { index as reportsIndex } from '@/routes/reports';
 import { index as tagsIndex } from '@/routes/tags';
 import { index as transactionsIndex } from '@/routes/transactions';
 import { index as workspacesIndex } from '@/routes/workspaces';
@@ -74,6 +76,11 @@ const mainNavItems: NavItem[] = [
         title: 'Utang & piutang',
         href: debtsIndex(),
         icon: HandCoins,
+    },
+    {
+        title: 'Laporan',
+        href: reportsIndex(),
+        icon: FileBarChart,
     },
     {
         title: 'Kategori',

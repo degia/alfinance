@@ -150,26 +150,30 @@ class DashboardService
                 $first = $month->startOfMonth()->subMonthsNoOverflow($months - 1);
                 $last = $month->startOfMonth();
 
-                $rows = DashboardSnapshot::allWorkspaces()
-                    ->where('workspace_id', $workspaceId)
-                    ->betweenMonths($first, $last)
-                    ->orderBy('month')
-                    ->get()
-                    ->keyBy(fn (DashboardSnapshot $snapshot): string => $snapshot->monthKey());
+                $rows = $this->indexByMonth(
+                    DashboardSnapshot::allWorkspaces()
+                        ->where('workspace_id', $workspaceId)
+                        ->betweenMonths($first, $last)
+                        ->orderBy('month')
+                        ->get(),
+                );
 
                 $points = [];
 
                 for ($offset = 0; $offset < $months; $offset++) {
                     $cursor = $first->addMonthsNoOverflow($offset);
                     $key = MonthPeriod::key($cursor);
-                    $snapshot = $rows->get($key);
+                    $snapshot = $rows[$key] ?? null;
 
                     $points[] = [
                         'month' => $key,
                         'label' => MonthPeriod::shortLabel($key),
-                        'income' => $snapshot?->total_income ?? '0.00',
-                        'expense' => $snapshot?->total_expense ?? '0.00',
-                        'net_cash_flow' => $snapshot?->net_cash_flow ?? '0.00',
+                        // Bulan tanpa snapshot dilaporkan sebagai nol, bukan
+                        // error: tren harus tetap punya titik untuk setiap bulan
+                        // agar sumbu waktu tidak berlubang.
+                        'income' => $snapshot === null ? '0.00' : $snapshot->total_income,
+                        'expense' => $snapshot === null ? '0.00' : $snapshot->total_expense,
+                        'net_cash_flow' => $snapshot === null ? '0.00' : $snapshot->net_cash_flow,
                         'has_data' => $snapshot !== null,
                         'is_current' => $key === MonthPeriod::key($month),
                     ];
@@ -209,10 +213,18 @@ class DashboardService
             CacheContext::DashboardBreakdown,
             $period,
             function () use ($workspaceId, $month): array {
+                // `toBase()` deliberate: baris di-hydrate sebagai objek datar
+                // dengan kolom yang sudah dipilih. Mengambil `category` sebagai
+                // relasi akan menambah satu query per kategori (N+1) hanya untuk
+                // tiga kolom yang sudah ada di tabel `categories`.
                 $rows = BudgetProgress::allWorkspaces()
+                    ->toBase()
                     ->select([
                         'budget_progress_cache.category_id',
                         'budget_progress_cache.used_amount',
+                        'categories.name as category_name',
+                        'categories.color as category_color',
+                        'categories.icon as category_icon',
                     ])
                     ->join('categories', 'categories.id', '=', 'budget_progress_cache.category_id')
                     // Second tenant guard: id kategori unik global, tapi
@@ -226,22 +238,18 @@ class DashboardService
                     ->get();
 
                 $total = Money::sum(
-                    $rows->map(fn (BudgetProgress $row): string => $row->used_amount)->all()
+                    $rows->map(fn (object $row): string => (string) $row->used_amount)->all()
                 );
 
                 $items = $rows
-                    ->map(function (BudgetProgress $row) use ($total): array {
-                        $category = $row->category;
-
-                        return [
-                            'category_id' => (int) $row->category_id,
-                            'name' => $category?->name ?? 'Tanpa kategori',
-                            'color' => $category?->color ?? '#94a3b8',
-                            'icon' => $category?->icon->value,
-                            'amount' => $row->used_amount,
-                            'percent' => Money::percentageOf($row->used_amount, $total),
-                        ];
-                    })
+                    ->map(fn (object $row): array => [
+                        'category_id' => (int) $row->category_id,
+                        'name' => (string) $row->category_name,
+                        'color' => (string) $row->category_color,
+                        'icon' => (string) $row->category_icon,
+                        'amount' => (string) $row->used_amount,
+                        'percent' => Money::percentageOf((string) $row->used_amount, $total),
+                    ])
                     ->values()
                     ->all();
 
@@ -359,16 +367,38 @@ class DashboardService
         $current = $month->startOfMonth();
         $previous = $current->subMonthsNoOverflow(1);
 
-        $rows = DashboardSnapshot::allWorkspaces()
-            ->where('workspace_id', $workspaceId)
-            ->whereIn('month', [
-                $current->toDateString(),
-                $previous->toDateString(),
-            ])
-            ->get()
-            ->keyBy(fn (DashboardSnapshot $snapshot): string => $snapshot->monthKey());
+        $rows = $this->indexByMonth(
+            DashboardSnapshot::allWorkspaces()
+                ->where('workspace_id', $workspaceId)
+                ->whereIn('month', [
+                    $current->toDateString(),
+                    $previous->toDateString(),
+                ])
+                ->get(),
+        );
 
-        return [$rows->get(MonthPeriod::key($current)), $rows->get(MonthPeriod::key($previous))];
+        return [$rows[MonthPeriod::key($current)] ?? null, $rows[MonthPeriod::key($previous)] ?? null];
+    }
+
+    /**
+     * Indeks snapshot per `Y-m` dalam bentuk array biasa.
+     *
+     * Sengaja bukan `keyBy()->all()`: tipe generik `keyBy()` tidak pernah
+     * berubah dari tipe kunci aslinya, sehingga akses kunci string berikutnya
+     * lolos secara statis dan `?? null` ikut dianggap tidak pernah null.
+     *
+     * @param  Collection<int, DashboardSnapshot>  $snapshots
+     * @return array<string, DashboardSnapshot>
+     */
+    private function indexByMonth(Collection $snapshots): array
+    {
+        $index = [];
+
+        foreach ($snapshots as $snapshot) {
+            $index[$snapshot->monthKey()] = $snapshot;
+        }
+
+        return $index;
     }
 
     /**

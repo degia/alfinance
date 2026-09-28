@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\FinancialHealthLabel;
+use App\Jobs\RecomputeFinancialHealthJob;
 use App\Support\MonthPeriod;
 use Carbon\CarbonImmutable;
 use Database\Factories\FinancialHealthScoreFactory;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 /**
  * Skor kesehatan finansial bulanan (PRD.md §3.9).
  *
- * Ditulis {@see \App\Jobs\RecomputeFinancialHealthJob} dari snapshot bulanan
+ * Ditulis {@see RecomputeFinancialHealthJob} dari snapshot bulanan
  * lalu dibaca lewat cache Redis. Satu baris per workspace per bulan, jadi skor
  * bulan yang sudah lewat tidak ikut berubah ketika transaksi bulan ini masih
  * berjalan.

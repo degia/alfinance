@@ -13,7 +13,7 @@ use App\Services\Cache\WorkspaceCache;
  * Write-behind invalidation (ARCHITECTURE.md §2.1 butir 2, §2.2).
  *
  * Listener ini hanya menghapus kunci cache. Tidak ada agregasi, tidak ada
- * `SUM()` — angka susulannya dihitung {@see \App\Listeners\ScheduleAggregateRecompute}
+ * `SUM()` — angka susulannya dihitung {@see ScheduleAggregateRecompute}
  * di antrean, supaya request yang menyimpan transaksi tidak ikut menunggu.
  *
  * Invalidasi sengaja melebar ke semua konteks turunan workspace: satu
