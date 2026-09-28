@@ -3,9 +3,12 @@
 namespace App\Jobs;
 
 use App\Models\RecurringRule;
+use App\Models\Transaction;
 use App\Services\Transactions\TransactionManager;
 use App\Support\Workspace\ActiveWorkspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 
@@ -21,6 +24,10 @@ use Illuminate\Support\Facades\Log;
  * Idempoten: satu rule hanya boleh menghasilkan satu instance per tanggal
  * `next_run_at`, sehingga job yang dijalankan ulang di hari yang sama tidak
  * membuat duplikat.
+ *
+ * Jadwal bulanan/tahunan memakai tanggal jangkar yang diambil dari instance
+ * pertama rule, sehingga tanggal 31 tidak bergeser permanen ke tanggal 28
+ * setelah melewati Februari.
  */
 class RecurringTransactionJob implements ShouldQueue
 {
@@ -42,12 +49,42 @@ class RecurringTransactionJob implements ShouldQueue
                 ->get(),
         );
 
+        if ($due->isEmpty()) {
+            return;
+        }
+
+        $anchors = $this->anchorDays($due);
+
         foreach ($due as $rule) {
-            $this->generate($rule, $transactions);
+            $this->generate($rule, $transactions, $anchors[$rule->id] ?? null);
         }
     }
 
-    private function generate(RecurringRule $rule, TransactionManager $transactions): void
+    /**
+     * Tanggal jangkar tiap rule dalam batch, diambil dengan satu query.
+     *
+     * Jangkar dibaca dari instance transaksi paling awal per rule supaya jadwal
+     * tanggal 31 tidak bergeser permanen ke tanggal 28 setelah melewati
+     * Februari. Query-nya agregat `MIN(occurred_at)` per rule: satu baris per
+     * rule, bukan seluruh riwayat instance (yang bisa ribuan baris untuk rule
+     * harian yang sudah berjalan bertahun-tahun).
+     *
+     * @param  EloquentCollection<int, RecurringRule>  $rules
+     * @return array<int, int>
+     */
+    private function anchorDays(EloquentCollection $rules): array
+    {
+        $firstOccurrence = Transaction::allWorkspaces()
+            ->whereIn('recurring_rule_id', $rules->modelKeys())
+            ->groupBy('recurring_rule_id')
+            ->pluck('MIN(occurred_at)', 'recurring_rule_id');
+
+        return $firstOccurrence
+            ->map(static fn (string $occurredAt): int => CarbonImmutable::parse($occurredAt)->day)
+            ->all();
+    }
+
+    private function generate(RecurringRule $rule, TransactionManager $transactions, ?int $anchorDay = null): void
     {
         $workspace = $rule->workspace;
 
@@ -75,7 +112,7 @@ class RecurringTransactionJob implements ShouldQueue
                 $transactions->createFromRule($rule);
             }
 
-            $rule->advanceNextRun();
+            $rule->advanceNextRun($anchorDay);
             $rule->save();
         } finally {
             ActiveWorkspace::set($previousScope);

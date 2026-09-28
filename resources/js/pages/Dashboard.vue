@@ -18,6 +18,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAppearance } from '@/composables/useAppearance';
+import { chartAnimation, chartToken } from '@/lib/chart';
 import { formatCurrency, formatDate, toNumber } from '@/lib/format';
 import { dashboard } from '@/routes';
 import type {
@@ -221,13 +223,13 @@ function renderTrendChart(): void {
                 {
                     label: 'Pemasukan',
                     data: points.map((point) => toNumber(point.income) ?? 0),
-                    backgroundColor: 'rgb(16 185 129)',
+                    backgroundColor: chartToken('income'),
                     borderRadius: 4,
                 },
                 {
                     label: 'Pengeluaran',
                     data: points.map((point) => toNumber(point.expense) ?? 0),
-                    backgroundColor: 'rgb(244 63 94)',
+                    backgroundColor: chartToken('expense'),
                     borderRadius: 4,
                 },
             ],
@@ -236,6 +238,7 @@ function renderTrendChart(): void {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
+            animation: chartAnimation(),
             plugins: {
                 legend: { display: true, position: 'bottom' },
                 tooltip: {
@@ -250,7 +253,7 @@ function renderTrendChart(): void {
                     ticks: {
                         callback: (value) => formatCurrency(Number(value)),
                     },
-                    grid: { color: 'rgba(148, 163, 184, 0.2)' },
+                    grid: { color: chartToken('grid') },
                 },
                 x: { grid: { display: false } },
             },
@@ -292,7 +295,7 @@ const donutSlices = computed(() => {
         {
             label: 'Lainnya',
             amount: restTotal,
-            color: '#94a3b8',
+            color: chartToken('neutral'),
         },
     ];
 });
@@ -331,6 +334,7 @@ function renderBreakdownChart(): void {
             responsive: true,
             maintainAspectRatio: false,
             cutout: '65%',
+            animation: chartAnimation(),
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -400,6 +404,17 @@ watch(
 );
 
 watch(donutSlices, () => renderBreakdownChart(), { deep: true });
+
+/*
+| Chart digambar ke canvas, jadi warna token harus dibaca ulang saat tema
+| berubah; tanpa ini chart tetap memakai warna light di dark mode.
+*/
+const { resolvedAppearance } = useAppearance();
+
+watch(resolvedAppearance, () => {
+    renderTrendChart();
+    renderBreakdownChart();
+});
 </script>
 
 <template>
@@ -648,7 +663,7 @@ watch(donutSlices, () => renderBreakdownChart(), { deep: true });
                         aria-label="Skor kesehatan keuangan"
                     >
                         <div
-                            class="h-full rounded-full bg-primary transition-[width]"
+                            class="neu-progress h-full rounded-full bg-primary"
                             :style="{ width: `${props.health.score}%` }"
                         />
                     </div>

@@ -53,9 +53,9 @@ const props = defineProps<{
 }>();
 
 const toneClass: Record<string, string> = {
-    success: 'bg-emerald-500 text-white',
-    warning: 'bg-amber-500 text-white',
-    danger: 'bg-rose-500 text-white',
+    success: 'bg-success text-success-foreground',
+    warning: 'bg-warning text-warning-foreground',
+    danger: 'bg-destructive-solid text-destructive-foreground',
     neutral: 'bg-secondary text-secondary-foreground',
 };
 

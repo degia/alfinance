@@ -145,10 +145,15 @@ class RecurringRule extends WorkspaceScopedModel
     /**
      * Koccurensi berikutnya, dibatasi `end_date` kalau ada: kalau occurrence
      * berikutnya melewati tanggal akhir, rule di-nonaktifkan.
+     *
+     * `$anchorDay` mempertahankan tanggal asli yang diminta user. Pemanggil
+     * yang sudah tahu anchor tersebut (job, yang membacanya sekali untuk satu
+     * batch) meneruskannya di sini; kalau tidak, anchor diambil dari tanggal
+     * `next_run_at` saat ini — yang benar untuk rule yang belum pernah jalan.
      */
-    public function advanceNextRun(): void
+    public function advanceNextRun(?int $anchorDay = null): void
     {
-        $next = $this->frequency->nextOccurrence($this->next_run_at);
+        $next = $this->frequency->nextOccurrence($this->next_run_at, $anchorDay);
 
         if ($this->end_date !== null && $next->greaterThan(CarbonImmutable::parse($this->end_date)->endOfDay())) {
             $this->is_active = false;
@@ -156,5 +161,34 @@ class RecurringRule extends WorkspaceScopedModel
 
         $this->next_run_at = $next;
         $this->last_generated_at = CarbonImmutable::now();
+    }
+
+    /**
+     * Tanggal dalam bulan yang jadi jangkar jadwal, atau null kalau rule belum
+     * pernah menghasilkan instance.
+     *
+     * Jangkar diambil dari instance paling awal - itu occurrence pertama, yang
+     * memakai `next_run_at` apa adanya saat rule dibuat. Karena instance
+     * sekarang bisa sudah di-clamp (31 Jan -> 28 Feb), tanggal instance
+     * terbaru tidak boleh dipakai: hanya yang pertama yang mewakili pilihan
+     * user.
+     *
+     * Sengaja tidak di-query di sini: `RecurringTransactionJob` membaca anchor
+     * seluruh batch sekaligus lewat agregat `MIN(occurred_at)`, jadi memanggil
+     * versi per-rule di sini hanya membuka jalan N+1 tanpa dipakai.
+     */
+    public function anchorDay(): ?int
+    {
+        $first = $this->transactions()
+            ->reorder()
+            ->orderBy('occurred_at')
+            ->orderBy('id')
+            ->value('occurred_at');
+
+        if ($first === null) {
+            return null;
+        }
+
+        return CarbonImmutable::parse($first)->day;
     }
 }

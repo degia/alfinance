@@ -354,7 +354,7 @@ function creditTone(percent: number): string {
             <Card
                 v-for="account in accounts"
                 :key="account.id"
-                class="rounded-2xl border-0 shadow-neu-flat transition-shadow hover:shadow-neu-hover"
+                class="rounded-2xl border-0 shadow-neu-flat"
             >
                 <CardContent class="flex flex-col gap-4 p-5">
                     <div class="flex items-start justify-between gap-3">
@@ -411,7 +411,7 @@ function creditTone(percent: number): string {
                         </div>
                         <div class="neu-inset h-2 rounded-full">
                             <div
-                                class="h-2 rounded-full transition-[width] duration-300"
+                                class="neu-progress h-2 rounded-full"
                                 :class="
                                     creditTone(
                                         account.credit_usage_percent ?? 0,

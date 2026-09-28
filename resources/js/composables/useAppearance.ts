@@ -64,7 +64,18 @@ const prefersDark = (): boolean => {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
 };
 
+/**
+ * Tema sistem disimpan sebagai ref, bukan dibaca langsung di dalam computed:
+ * tanpa ini, `resolvedAppearance` tidak pernah recompute saat OS berubah
+ * selama pengguna memilih mode "system".
+ */
+const systemTheme = ref<'light' | 'dark'>('light');
+
+systemTheme.value = prefersDark() ? 'dark' : 'light';
+
 const handleSystemThemeChange = () => {
+    systemTheme.value = prefersDark() ? 'dark' : 'light';
+
     const currentAppearance = getStoredAppearance();
 
     updateTheme(currentAppearance || 'system');
@@ -96,13 +107,9 @@ export function useAppearance(): UseAppearanceReturn {
         }
     });
 
-    const resolvedAppearance = computed<ResolvedAppearance>(() => {
-        if (appearance.value === 'system') {
-            return prefersDark() ? 'dark' : 'light';
-        }
-
-        return appearance.value;
-    });
+    const resolvedAppearance = computed<ResolvedAppearance>(() =>
+        appearance.value === 'system' ? systemTheme.value : appearance.value,
+    );
 
     function updateAppearance(value: Appearance) {
         appearance.value = value;

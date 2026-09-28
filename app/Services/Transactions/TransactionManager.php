@@ -86,6 +86,7 @@ class TransactionManager
         bool $removeAttachment = false,
     ): Transaction {
         $previousDeltas = $transaction->reversedBalanceDeltas();
+        $previousMonth = $transaction->occurred_at->format('Y-m');
 
         $updated = DB::transaction(function () use ($transaction, $attributes, $actorId, $tagIds, $attachment, $removeAttachment, $previousDeltas): Transaction {
             $transaction->fill($attributes);
@@ -111,7 +112,9 @@ class TransactionManager
             return $transaction;
         });
 
-        TransactionSaved::dispatch($updated);
+        // Bulan lama ikut dibawa supaya agregat bulan itu juga di-invalidate
+        // ketika tanggal transaksi dikoreksi ke bulan lain.
+        TransactionSaved::dispatch($updated, previousMonth: $previousMonth);
 
         return $updated;
     }

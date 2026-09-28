@@ -20,6 +20,17 @@ import { useSidebar } from '@/components/ui/sidebar';
  */
 const { state } = useSidebar();
 
+/**
+ * Transisi memakai token motion yang sama dengan sisa aplikasi
+ * (`--motion-slow` + `--ease-neu`), bukan durasi hardcode, supaya active
+ * bar tidak menyimpang dari kartu dan tombol.
+ */
+const barTransition: Record<string, string> = {
+    top: 'var(--motion-slow) var(--ease-neu)',
+    height: 'var(--motion-slow) var(--ease-neu)',
+    opacity: 'var(--motion-base) var(--ease-neu)',
+};
+
 const navRef = ref<HTMLElement | null>(null);
 const isCollapsed = computed(() => state.value === 'collapsed');
 const currentUrl = computed(() => usePage().url);
@@ -81,8 +92,8 @@ onBeforeUnmount(() => {
 
         <span
             aria-hidden="true"
-            class="pointer-events-none absolute inset-y-0 left-0 z-10 w-1 rounded-r-full bg-primary transition-[top,height,opacity] duration-300 ease-out"
-            :style="barStyle"
+            class="pointer-events-none absolute inset-y-0 left-0 z-10 w-1 rounded-r-full bg-primary"
+            :style="[barTransition, barStyle]"
         />
     </div>
 </template>

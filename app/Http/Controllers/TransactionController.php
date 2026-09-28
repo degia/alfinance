@@ -66,6 +66,19 @@ class TransactionController extends Controller
             // halaman tidak bergetar saat dua transaksi punya tanggal sama.
             ->orderByDesc('occurred_at')
             ->orderByDesc('id')
+            // Relasi yang dipakai `present()` di-hydrate sekarang: tanpa ini
+            // setiap baris memicu lima query (akun, tujuan transfer, kategori,
+            // tag, lampiran) sehingga satu halaman daftar jadi ratusan query
+            // (ARCHITECTURE.md §2.1 butir 5: N+1 dilarang). Kolom yang
+            // dipilih persis yang dipakai payload; `tags` boleh tanpa kolom
+            // pivot karena `BelongsToMany` menambahkannya sendiri.
+            ->with([
+                'account:id,workspace_id,name,type',
+                'transferToAccount:id,workspace_id,name,type',
+                'category:id,workspace_id,name,color',
+                'tags:id,workspace_id,name',
+                'attachments:id,workspace_id,transaction_id,original_name,mime_type,size',
+            ])
             ->paginate($request->perPage())
             ->withQueryString();
 
@@ -130,7 +143,17 @@ class TransactionController extends Controller
         $this->authorizeViewData();
 
         return Inertia::render('transactions/Edit', [
-            'transaction' => $this->present($transaction),
+            // `present()` membaca lima relasi; dimuat eksplisit supaya form edit
+            // tidak memicu lima query tambahan.
+            'transaction' => $this->present(
+                $transaction->load([
+                    'account',
+                    'transferToAccount',
+                    'category',
+                    'tags',
+                    'attachments',
+                ]),
+            ),
             'options' => [
                 'accounts' => $this->accountOptions(),
                 'categories' => $this->categoryOptions(),

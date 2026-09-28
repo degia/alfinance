@@ -78,7 +78,7 @@ function leave(id: number): void {
                     v-for="item in workspaces"
                     :key="item.id"
                     type="button"
-                    class="group flex w-full items-center gap-3 rounded-xl p-3 text-left transition-shadow hover:shadow-neu-flat-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    class="group neu-highlightable flex w-full items-center gap-3 rounded-xl p-3 text-left hover:shadow-neu-flat-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     :class="item.is_active ? 'shadow-neu-pressed-sm' : ''"
                     @click="switchTo(item.id)"
                 >
@@ -109,7 +109,7 @@ function leave(id: number): void {
                         v-if="!item.is_owner"
                         variant="ghost"
                         size="sm"
-                        class="text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                        class="neu-color text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                         @click.stop="leave(item.id)"
                     >
                         <LogOut class="size-4" />

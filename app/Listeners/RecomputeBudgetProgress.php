@@ -23,7 +23,11 @@ class RecomputeBudgetProgress
 {
     public function handleSaved(TransactionSaved $event): void
     {
-        $this->queueFor($event->workspaceId(), $event->month());
+        // Bisa lebih dari satu bulan: tanggal transaksi yang dikoreksi ke bulan
+        // lain membuat progress anggaran bulan lamanya ikut basi.
+        foreach ($event->months() as $month) {
+            $this->queueFor($event->workspaceId(), $month);
+        }
     }
 
     public function handleDeleted(TransactionDeleted $event): void

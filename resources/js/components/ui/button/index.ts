@@ -11,7 +11,7 @@ export const buttonVariants = cva(
         default:
           "bg-primary text-primary-foreground shadow-neu-primary hover:bg-primary/90 active:shadow-neu-pressed-sm",
         destructive:
-          "bg-destructive text-white shadow-neu-primary hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 active:shadow-neu-pressed-sm",
+          "bg-destructive-solid text-destructive-foreground shadow-neu-primary hover:bg-destructive-solid/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 active:shadow-neu-pressed-sm",
         outline:
           "border border-border/60 bg-background shadow-neu-flat-sm hover:bg-secondary hover:text-secondary-foreground active:shadow-neu-pressed-sm",
         secondary:

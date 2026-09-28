@@ -337,7 +337,7 @@ const summaryCards = computed(() => [
                                             </span>
                                             <button
                                                 type="button"
-                                                class="text-[10px] text-primary hover:underline"
+                                                class="neu-color rounded text-[10px] text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                                 @click="
                                                     openCreate(
                                                         cell.month,

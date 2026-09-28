@@ -9,6 +9,7 @@ use App\Http\Controllers\Concerns\AuthorizesWorkspaceData;
 use App\Http\Requests\NetWorthItemRequest;
 use App\Models\NetWorthItem;
 use App\Services\NetWorth\NetWorthService;
+use App\Support\Money;
 use App\Support\MonthPeriod;
 use App\Support\Workspace\ActiveWorkspace;
 use Carbon\CarbonImmutable;
@@ -48,7 +49,13 @@ class NetWorthController extends Controller
                 'net_worth' => $summary['net_worth'],
                 'item_assets' => $summary['item_assets'],
                 'item_liabilities' => $summary['item_liabilities'],
-                'credit_card_outstanding' => $this->netWorth->creditCardOutstanding($this->workspaceId())['outstanding'],
+                // Dihitung dari baris kartu kredit yang sudah diambil
+                // `NetWorthService::current()`; memanggil
+                // `creditCardOutstanding()` lagi di sini berarti satu query
+                // tambahan untuk angka yang sudah ada di memori.
+                'credit_card_outstanding' => Money::sum(
+                    array_column($summary['credit_cards'], 'outstanding'),
+                ),
                 'debt_payable' => $summary['debt_payable'],
                 'debt_receivable' => $summary['debt_receivable'],
                 'change' => $this->change(),

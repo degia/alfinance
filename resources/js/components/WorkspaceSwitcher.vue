@@ -58,7 +58,7 @@ function manageWorkspaces(): void {
         <DropdownMenuTrigger as-child>
             <Button
                 variant="ghost"
-                class="h-9 max-w-56 gap-2 rounded-xl px-2 shadow-neu-flat-sm transition-shadow hover:shadow-neu-hover"
+                class="neu-highlightable h-9 max-w-56 gap-2 rounded-xl px-2 shadow-neu-flat-sm hover:shadow-neu-hover"
             >
                 <span
                     class="grid size-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-xs font-semibold text-primary"

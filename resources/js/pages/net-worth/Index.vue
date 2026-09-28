@@ -36,6 +36,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { useAppearance } from '@/composables/useAppearance';
+import { chartAnimation, chartToken } from '@/lib/chart';
 import { formatCurrency, formatSignedCurrency, toNumber } from '@/lib/format';
 import {
     destroy as destroyItem,
@@ -218,8 +220,8 @@ function renderChart(): void {
                 {
                     label: 'Net worth',
                     data: values,
-                    borderColor: 'rgb(16 185 129)',
-                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                    borderColor: chartToken('income'),
+                    backgroundColor: chartToken('incomeSoft'),
                     tension: 0.35,
                     fill: true,
                     spanGaps: true,
@@ -231,6 +233,7 @@ function renderChart(): void {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
+            animation: chartAnimation(),
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -250,7 +253,7 @@ function renderChart(): void {
                     ticks: {
                         callback: (value) => formatCurrency(Number(value)),
                     },
-                    grid: { color: 'rgba(148, 163, 184, 0.2)' },
+                    grid: { color: chartToken('grid') },
                 },
                 x: { grid: { display: false } },
             },
@@ -261,6 +264,14 @@ function renderChart(): void {
 onMounted(renderChart);
 onBeforeUnmount(() => chart?.destroy());
 watch(() => props.series, renderChart, { deep: true });
+
+/*
+| Warna garis tren berasal dari token CSS, jadi chart harus digambar ulang
+| saat light/dark mode berubah.
+*/
+const { resolvedAppearance } = useAppearance();
+
+watch(resolvedAppearance, renderChart);
 </script>
 
 <template>

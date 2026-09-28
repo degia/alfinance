@@ -31,7 +31,11 @@ class ScheduleAggregateRecompute
 {
     public function handleTransactionSaved(TransactionSaved $event): void
     {
-        $this->queue($event->workspaceId(), $event->month());
+        // Bisa lebih dari satu bulan: tanggal transaksi yang dikoreksi ke bulan
+        // lain membuat snapshot bulan lamanya ikut basi.
+        foreach ($event->months() as $month) {
+            $this->queue($event->workspaceId(), $month);
+        }
     }
 
     public function handleTransactionDeleted(TransactionDeleted $event): void

@@ -54,6 +54,7 @@
 
     --color-destructive: var(--destructive);
     --color-destructive-foreground: var(--destructive-foreground);
+    --color-destructive-solid: var(--destructive-solid);
 
     --color-success: var(--success);
     --color-success-foreground: var(--success-foreground);
@@ -73,6 +74,8 @@
 
     --color-income: var(--income);
     --color-expense: var(--expense);
+    --color-income-soft: var(--income-soft);
+    --color-expense-soft: var(--expense-soft);
 
     --color-sidebar: var(--sidebar-background);
     --color-sidebar-foreground: var(--sidebar-foreground);
@@ -82,6 +85,14 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
+
+    /*
+      Progress bar Inertia: Inertia hanya menerima string warna, bukan kelas
+      utility, jadi token `--progress-bar` ini dibaca lewat
+      `getComputedStyle` di `resources/js/app.ts` (berganti sendiri antara mode
+      terang dan gelap). Tidak ada warna hardcode di JS.
+     */
+    --color-progress-bar: var(--progress-bar);
 }
 
 /*
@@ -164,15 +175,30 @@
     --muted: hsl(214 38% 94%);
     --muted-foreground: hsl(215 18% 42%);
 
-    --destructive: hsl(0 72% 51%);
+    --destructive: hsl(0 72% 49%);
     --destructive-foreground: hsl(0 0% 100%);
-    --success: hsl(152 62% 38%);
+    /*
+      Warna latar tombol "danger". Dipisah dari `--destructive` karena satu
+      token tidak mungkin sekaligus|miemen 4.5:1 untuk teks putih di atasnya
+      (4.66) dan 4.5:1 sebagai teks di atas background terang (4.59) — jadi
+      mode terang memakai nilai yang sama, mode gelap memakai nilai lebih
+      gelap khusus untuk bidang solid.
+     */
+    --destructive-solid: hsl(0 72% 49%);
+    --success: hsl(152 62% 32%);
     --success-foreground: hsl(0 0% 100%);
     --warning: hsl(38 92% 45%);
-    --warning-foreground: hsl(0 0% 100%);
+    /* Amber terang butuh teks gelap: putih hanya 2.63:1. */
+    --warning-foreground: hsl(222 47% 11%);
 
     --border: hsl(214 30% 89%);
-    --input: hsl(214 30% 90%);
+    /*
+      Border kontrol (input, select, checkbox) wajib 3:1 terhadap permukaan
+      di sekitarnya (WCAG 1.4.11 Non-text Contrast) karena itulah yang
+      membuat batas field tetap terbaca. `--border` tetap ringan untuk garis
+      pemisah dekoratif; hanya `--input` yang ditegaskan.
+     */
+    --input: hsl(214 30% 57%);
     --ring: hsl(221 83% 53%);
 
     /* Chart palette: biru & ungu sebagai warna utama */
@@ -183,8 +209,22 @@
     --chart-5: hsl(340 82% 52%);
 
     /* Semantik nominal (dipakai kartu KPI & chart cash flow) */
-    --income: hsl(152 62% 38%);
-    --expense: hsl(0 72% 51%);
+    --income: hsl(152 62% 30%);
+    --expense: hsl(0 72% 49%);
+
+    /* Versi transparan untuk area fill chart garis & bar transparan. */
+    --income-soft: hsl(152 62% 30% / 0.16);
+    --expense-soft: hsl(0 72% 49% / 0.16);
+
+    /*
+      | Skala motion — satu sumber durasi/easing untuk hover, transisi
+      | komponen, active bar sidebar, dan animasi Chart.js. Nilai dalam ms
+      | supaya `resources/js/lib/chart.ts` bisa membacanya langsung.
+     */
+    --motion-fast: 150ms;
+    --motion-base: 200ms;
+    --motion-slow: 300ms;
+    --ease-neu: cubic-bezier(0.2, 0, 0, 1);
 
     /* Neumorphism */
     --neu-light: hsl(0 0% 100%);
@@ -205,6 +245,9 @@
     --sidebar-border: hsl(214 30% 89%);
     --sidebar-ring: hsl(221 83% 53%);
     --sidebar: hsl(214 42% 96%);
+
+    /* Warna progress bar Inertia (lihat catatan di blok @theme). */
+    --progress-bar: hsl(221 83% 53%);
 }
 
 .dark {
@@ -231,13 +274,17 @@
 
     --destructive: hsl(0 72% 58%);
     --destructive-foreground: hsl(0 0% 100%);
+    /* Teks putih butuh latar lebih gelap supaya tetap 4.5:1 (4.60). */
+    --destructive-solid: hsl(0 72% 53%);
     --success: hsl(152 55% 48%);
-    --success-foreground: hsl(0 0% 100%);
+    /* Hijau terang + teks putih hanya 2.38:1, jadi teksnya yang digelapkan. */
+    --success-foreground: hsl(158 60% 8%);
     --warning: hsl(38 90% 55%);
     --warning-foreground: hsl(222 47% 8%);
 
     --border: hsl(222 20% 20%);
-    --input: hsl(222 20% 22%);
+    /* Sama seperti mode terang: batas kontrol harus 3:1 (3.27 / 3.05). */
+    --input: hsl(222 20% 44%);
     --ring: hsl(221 90% 66%);
 
     --chart-1: hsl(221 90% 66%);
@@ -247,7 +294,10 @@
     --chart-5: hsl(340 80% 65%);
 
     --income: hsl(152 55% 48%);
-    --expense: hsl(0 72% 58%);
+    --expense: hsl(0 72% 61%);
+
+    --income-soft: hsl(152 55% 48% / 0.2);
+    --expense-soft: hsl(0 72% 61% / 0.2);
 
     --neu-light: hsl(222 24% 18%);
     --neu-dark: hsl(222 40% 6%);
@@ -265,6 +315,8 @@
     --sidebar-border: hsl(222 20% 20%);
     --sidebar-ring: hsl(221 90% 66%);
     --sidebar: hsl(222 32% 9%);
+
+    --progress-bar: hsl(221 90% 66%);
 
     --shadow-neu-flat:
         -5px -5px 10px var(--neu-light), 5px 5px 10px var(--neu-dark);
@@ -298,7 +350,9 @@
 }
 
 /*
-| Helper semantik — dipakai lintas modul agar tidak ada warna/shadow hardcode.
+| Helper semantik — dipakai lintas modul agar tidak ada warna/shadow/
+| durasi hardcode. Warna & shadow lewat token Tailwind, motion lewat
+| kelas .neu-* di bawah.
 */
 @layer components {
     .neu-card {
@@ -314,6 +368,65 @@
     }
 
     .neu-interactive {
-        @apply transition-[box-shadow,transform,color] duration-200 ease-out;
+        transition:
+            box-shadow var(--motion-base) var(--ease-neu),
+            transform var(--motion-base) var(--ease-neu),
+            color var(--motion-base) var(--ease-neu),
+            background-color var(--motion-base) var(--ease-neu),
+            border-color var(--motion-base) var(--ease-neu),
+            opacity var(--motion-base) var(--ease-neu);
+    }
+
+    /*
+      | Permukaan yang bisa diklik: hanya shadow, tanpa lift, supaya elemen
+      | dengan tinggi tetap (baris daftar, tombol dropdown) tidak bergeser
+      | saat hover.
+     */
+    .neu-highlightable {
+        transition: box-shadow var(--motion-base) var(--ease-neu);
+    }
+
+    .neu-highlightable:hover {
+        box-shadow: var(--shadow-neu-hover);
+    }
+
+    /*
+      | Micro-feedback warna (link, underline, tab, badge): durasi cepat dan
+      | tanpa gerak, supaya teks tidak terasa "lambat" saat hover.
+     */
+    .neu-color {
+        transition:
+            color var(--motion-fast) var(--ease-neu),
+            background-color var(--motion-fast) var(--ease-neu),
+            border-color var(--motion-fast) var(--ease-neu),
+            text-decoration-color var(--motion-fast) var(--ease-neu),
+            opacity var(--motion-fast) var(--ease-neu);
+    }
+
+    /* Progress bar: hanya lebar yang dianimasikan, dengan durasi lambat. */
+    .neu-progress {
+        transition: width var(--motion-slow) var(--ease-neu);
+    }
+
+    /* Munculnya blok kode pemulihan (elevasi + opacity). */
+    .neu-reveal {
+        transition: all var(--motion-slow) var(--ease-neu);
+    }
+}
+
+/*
+  | Aksesibilitas gerakan: pengguna yang memilih reduced motion di OS
+  | tetap dapat memahami perubahan state, tapi tanpa translate/zoom.
+  | Aturan ini juga menutupi animasi yang datang dari pustaka (reka-ui,
+  | tw-animate-css) tanpa harus disentuh per komponen.
+ */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
     }
 }

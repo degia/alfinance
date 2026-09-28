@@ -210,12 +210,19 @@ class Debt extends WorkspaceScopedModel
     /**
      * Jumlah cicilan yang sudah tercatat.
      *
-     * Query-nya eksplisit per workspace (bukan lewat relasi) supaya hitungannya
-     * sama dengan `DebtService::payments()` di konteks apa pun — termasuk saat
-     * dipanggil dari job atau console tanpa `ActiveWorkspace`.
+     * Kalau relasi sudah dimuat dengan `withCount('payments')` — seperti di
+     * daftar utang, yang memetakan banyak baris sekaligus — angka itu dipakai
+     * langsung supaya satu halaman tidak memicu satu query per utang. Kalau
+     * belum, jatuh ke query eksplisit per workspace (bukan lewat relasi) supaya
+     * hitungannya sama dengan `DebtService::payments()` di konteks apa pun,
+     * termasuk saat dipanggil dari job atau console tanpa `ActiveWorkspace`.
      */
     public function paidTermCount(): int
     {
+        if (array_key_exists('payments_count', $this->attributes)) {
+            return (int) $this->attributes['payments_count'];
+        }
+
         return DebtPayment::allWorkspaces()
             ->where('workspace_id', $this->workspace_id)
             ->where('debt_id', $this->id)

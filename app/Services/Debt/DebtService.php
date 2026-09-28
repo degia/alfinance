@@ -218,6 +218,10 @@ class DebtService
         return Debt::allWorkspaces()
             ->where('workspace_id', $workspaceId)
             ->with('account')
+            // `present()` memetakan tiap baris dan memanggil
+            // `Debt::paidTermCount()`; tanpa agregat ini daftar utang memicu
+            // satu query COUNT per baris.
+            ->withCount('payments')
             ->get()
             ->filter(fn (Debt $debt): bool => $debt->currentStatus($today) === $status)
             ->sortBy([

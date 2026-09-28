@@ -155,7 +155,10 @@ class BudgetController extends Controller
         foreach ($categories as $category) {
             $rows[] = $this->row($category, $year, $budgets);
 
-            foreach ($category->children()->orderBy('name')->get() as $child) {
+            // `children` sudah eager-load di query kategori di atas. Memakai
+            // relasi yang ter-load (diurutkan di PHP) supaya matriks anggaran
+            // tidak memicu satu query anak per kategori induk.
+            foreach ($category->children->sortBy('name') as $child) {
                 $rows[] = $this->row($child, $year, $budgets, nested: true);
             }
         }
