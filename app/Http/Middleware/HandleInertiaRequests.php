@@ -51,6 +51,8 @@ class HandleInertiaRequests extends Middleware
             'workspace' => $this->workspacePayload($user, $this->activeWorkspace()),
             'workspaces' => $this->workspacesPayload($user, $this->activeWorkspace()),
             'sidebarCollapsed' => (bool) ($user->sidebar_collapsed ?? false),
+            'backup_diff' => fn () => $request->session()->pull('backup_diff'),
+            'backup_result' => fn () => $request->session()->pull('backup_result'),
         ];
     }
 

@@ -5,9 +5,11 @@ namespace App\Providers;
 use App\Models\Workspace;
 use App\Policies\WorkspacePolicy;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -28,6 +30,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->configurePolicies();
+        $this->configureRateLimiters();
     }
 
     /**
@@ -58,5 +61,28 @@ class AppServiceProvider extends ServiceProvider
     protected function configurePolicies(): void
     {
         Gate::policy(Workspace::class, WorkspacePolicy::class);
+    }
+
+    /**
+     * Rate limit untuk modul Ekspor & Backup (ARCHITECTURE.md §2.1 butir 4):
+     * membatasi pembuatan ekspor/backup dan terutama restore, yang menulis
+     * ulang data workspace.
+     */
+    protected function configureRateLimiters(): void
+    {
+        RateLimiter::for('exports', fn (): Limit => $this->authLimit(20));
+        RateLimiter::for('backups', fn (): Limit => $this->authLimit(10));
+        RateLimiter::for('backups.restore', fn (): Limit => $this->authLimit(5));
+    }
+
+    /**
+     * Limit per pengguna terautentikasi; pengunjung dinonaktifkan (throttling
+     * tidak bermakna untuk request yang tidak perlu autentikasi).
+     */
+    private function authLimit(int $perMinute): Limit
+    {
+        return $this->app->make('request')->user()
+            ? Limit::perMinute($perMinute)->by((string) $this->app->make('request')->user()->id)
+            : Limit::none();
     }
 }

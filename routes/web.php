@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\BackupController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DebtController;
+use App\Http\Controllers\ExportController;
 use App\Http\Controllers\NetWorthController;
 use App\Http\Controllers\RecurringRuleController;
 use App\Http\Controllers\ReportController;
@@ -53,6 +55,26 @@ Route::middleware(['auth', 'verified', 'workspace.selected'])->group(function ()
     | memicu recompute manual.
     */
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+
+    /*
+    |----------------------------------------------------------------------
+    | Ekspor & Backup (Fase 7)
+    |----------------------------------------------------------------------
+    | Satu halaman menampilkan riwayat ekspor (PDF/Excel via antrean) dan
+    | backup JSON. Semua proses berat dipindah ke job; route ini hanya
+    | membuat permintaan, men-download berkas siap pakai, dan (untuk backup)
+    | menjalankan preview dry-run lalu restore setelah konfirmasi. Rate
+    | limiter `exports`/`backups`/`backups.restore` dibatasi per user
+    | (AppServiceProvider).
+    */
+    Route::get('exports', [ExportController::class, 'index'])->name('exports.index');
+    Route::post('exports', [ExportController::class, 'store'])->middleware('throttle:exports')->name('exports.store');
+    Route::get('exports/{export_job}/download', [ExportController::class, 'download'])->name('exports.download');
+
+    Route::post('backups', [BackupController::class, 'store'])->middleware('throttle:backups')->name('backups.store');
+    Route::post('backups/{backup}/preview', [BackupController::class, 'preview'])->middleware('throttle:backups')->name('backups.preview');
+    Route::post('backups/{backup}/restore', [BackupController::class, 'restore'])->middleware('throttle:backups.restore')->name('backups.restore');
+    Route::get('backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
 
     /*
     |----------------------------------------------------------------------

@@ -47,6 +47,28 @@ return [
             'report' => false,
         ],
 
+        /*
+         | Berkas ekspor (PDF/Excel) hasil job antrean (PRD.md §3.10).
+         | Unduh lewat FormRequest yang sudah memverifikasi tenant scope,
+         | bukan static URL, jadi `serve` dibiarkan off.
+         */
+        'exports' => [
+            'driver' => 'local',
+            'root' => storage_path('app/exports'),
+            'throw' => false,
+            'report' => false,
+        ],
+
+        /*
+         | File backup JSON (PRD.md §3.11).
+         */
+        'backups' => [
+            'driver' => 'local',
+            'root' => storage_path('app/backups'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

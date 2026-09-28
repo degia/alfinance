@@ -14,6 +14,7 @@ import {
     HandCoins,
     Target,
     TrendingUp,
+    Wrench,
 } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
@@ -33,6 +34,7 @@ import { index as accountsIndex } from '@/routes/accounts';
 import { index as budgetsIndex } from '@/routes/budgets';
 import { index as categoriesIndex } from '@/routes/categories';
 import { index as debtsIndex } from '@/routes/debts';
+import { index as exportsIndex } from '@/routes/exports';
 import { index as netWorthIndex } from '@/routes/net-worth';
 import { index as recurringRulesIndex } from '@/routes/recurring-rules';
 import { index as reportsIndex } from '@/routes/reports';
@@ -81,6 +83,11 @@ const mainNavItems: NavItem[] = [
         title: 'Laporan',
         href: reportsIndex(),
         icon: FileBarChart,
+    },
+    {
+        title: 'Ekspor & Backup',
+        href: exportsIndex(),
+        icon: Wrench,
     },
     {
         title: 'Kategori',
