@@ -37,7 +37,7 @@ void createInertiaApp({
         });
     },
     progress: {
-        // Token CSS, bukan hex:warnanya ikut light/dark mode.
+        // Token CSS, bukan hex, warnanya ikut light/dark mode.
         color: chartToken('progressBar'),
     },
 });

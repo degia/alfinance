@@ -162,14 +162,14 @@ function expenseChangeTone(value: string): string {
         />
 
         <Card class="rounded-2xl border-0 shadow-neu-flat">
-            <CardContent class="flex flex-wrap items-end gap-4 p-5">
+            <CardContent class="flex flex-wrap items-end gap-4">
                 <div class="grid gap-2">
                     <Label for="filter-from">Dari bulan</Label>
                     <Input
                         id="filter-from"
                         v-model="fromInput"
                         type="date"
-                        class="shadow-neu-inset"
+                        class="w-48 shadow-neu-inset"
                     />
                 </div>
 
@@ -179,7 +179,7 @@ function expenseChangeTone(value: string): string {
                         id="filter-to"
                         v-model="toInput"
                         type="date"
-                        class="shadow-neu-inset"
+                        class="w-48 shadow-neu-inset"
                     />
                 </div>
 
@@ -268,13 +268,13 @@ function expenseChangeTone(value: string): string {
             v-if="activeTab === 'cash_flow' && props.cash_flow.has_data"
             class="rounded-2xl border-0 shadow-neu-flat"
         >
-            <CardContent class="flex flex-col gap-4 p-5">
+            <CardContent class="flex flex-col gap-4">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <h3 class="text-sm font-semibold">Arus kas bulanan</h3>
                     <Badge
                         v-if="props.cash_flow.is_account_filtered"
                         variant="secondary"
-                        class="text-[10px]"
+                        class="text-2xs"
                     >
                         khusus akun terpilih
                     </Badge>
@@ -287,16 +287,16 @@ function expenseChangeTone(value: string): string {
                     <table class="w-full min-w-[540px] text-sm">
                         <thead class="text-xs text-muted-foreground uppercase">
                             <tr class="border-b">
-                                <th class="px-2 py-2 text-left">Bulan</th>
-                                <th class="px-2 py-2 text-right">Pemasukan</th>
-                                <th class="px-2 py-2 text-right">
+                                <th class="px-4 py-3 text-left">Bulan</th>
+                                <th class="px-4 py-3 text-right">Pemasukan</th>
+                                <th class="px-4 py-3 text-right">
                                     Pengeluaran
                                 </th>
-                                <th class="px-2 py-2 text-right">
+                                <th class="px-4 py-3 text-right">
                                     Arus bersih
                                 </th>
-                                <th class="px-2 py-2 text-right">Transfer</th>
-                                <th class="px-2 py-2 text-right">Transaksi</th>
+                                <th class="px-4 py-3 text-right">Transfer</th>
+                                <th class="px-4 py-3 text-right">Transaksi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -305,21 +305,21 @@ function expenseChangeTone(value: string): string {
                                 :key="point.month"
                                 class="border-b last:border-0"
                             >
-                                <td class="px-2 py-2 font-medium">
+                                <td class="px-4 py-3 font-medium">
                                     {{ point.label }}
                                 </td>
                                 <td
-                                    class="px-2 py-2 text-right text-emerald-600 tabular-nums dark:text-emerald-400"
+                                    class="px-4 py-3 text-right text-emerald-600 tabular-nums dark:text-emerald-400"
                                 >
                                     {{ formatCurrency(point.income) }}
                                 </td>
                                 <td
-                                    class="px-2 py-2 text-right text-rose-600 tabular-nums dark:text-rose-400"
+                                    class="px-4 py-3 text-right text-rose-600 tabular-nums dark:text-rose-400"
                                 >
                                     {{ formatCurrency(point.expense) }}
                                 </td>
                                 <td
-                                    class="px-2 py-2 text-right font-medium tabular-nums"
+                                    class="px-4 py-3 text-right font-medium tabular-nums"
                                     :class="
                                         expenseChangeTone(point.net_cash_flow)
                                     "
@@ -327,12 +327,12 @@ function expenseChangeTone(value: string): string {
                                     {{ formatCurrency(point.net_cash_flow) }}
                                 </td>
                                 <td
-                                    class="px-2 py-2 text-right text-muted-foreground tabular-nums"
+                                    class="px-4 py-3 text-right text-muted-foreground tabular-nums"
                                 >
                                     {{ formatCurrency(point.total_transfer) }}
                                 </td>
                                 <td
-                                    class="px-2 py-2 text-right text-muted-foreground tabular-nums"
+                                    class="px-4 py-3 text-right text-muted-foreground tabular-nums"
                                 >
                                     {{ point.transaction_count }}
                                 </td>
@@ -340,15 +340,15 @@ function expenseChangeTone(value: string): string {
                         </tbody>
                         <tfoot class="text-sm font-semibold">
                             <tr class="border-t">
-                                <td class="px-2 py-2">Total</td>
-                                <td class="px-2 py-2 text-right tabular-nums">
+                                <td class="px-4 py-3">Total</td>
+                                <td class="px-4 py-3 text-right tabular-nums">
                                     {{
                                         formatCurrency(
                                             props.cash_flow.totals.income,
                                         )
                                     }}
                                 </td>
-                                <td class="px-2 py-2 text-right tabular-nums">
+                                <td class="px-4 py-3 text-right tabular-nums">
                                     {{
                                         formatCurrency(
                                             props.cash_flow.totals.expense,
@@ -356,7 +356,7 @@ function expenseChangeTone(value: string): string {
                                     }}
                                 </td>
                                 <td
-                                    class="px-2 py-2 text-right tabular-nums"
+                                    class="px-4 py-3 text-right tabular-nums"
                                     :class="
                                         expenseChangeTone(
                                             props.cash_flow.totals
@@ -372,7 +372,7 @@ function expenseChangeTone(value: string): string {
                                     }}
                                 </td>
                                 <td
-                                    class="px-2 py-2 text-right text-muted-foreground tabular-nums"
+                                    class="px-4 py-3 text-right text-muted-foreground tabular-nums"
                                 >
                                     {{
                                         formatCurrency(
@@ -404,7 +404,7 @@ function expenseChangeTone(value: string): string {
             v-else-if="activeTab === 'cash_flow'"
             class="rounded-2xl border-0 shadow-neu-flat"
         >
-            <CardContent class="p-5">
+            <CardContent>
                 <p
                     class="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground"
                 >
@@ -418,7 +418,7 @@ function expenseChangeTone(value: string): string {
             v-if="activeTab === 'budget' && props.budget_vs_actual.has_data"
             class="rounded-2xl border-0 shadow-neu-flat"
         >
-            <CardContent class="flex flex-col gap-4 p-5">
+            <CardContent class="flex flex-col gap-4">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <h3 class="text-sm font-semibold">
                         Limit vs pemakaian per kategori
@@ -443,20 +443,20 @@ function expenseChangeTone(value: string): string {
                     <table class="w-full min-w-[640px] text-sm">
                         <thead class="text-xs text-muted-foreground uppercase">
                             <tr class="border-b">
-                                <th class="px-2 py-2 text-left">Kategori</th>
-                                <th class="px-2 py-2 text-right">
+                                <th class="px-4 py-3 text-left">Kategori</th>
+                                <th class="px-4 py-3 text-right">
                                     Total budget
                                 </th>
-                                <th class="px-2 py-2 text-right">
+                                <th class="px-4 py-3 text-right">
                                     Total realisasi
                                 </th>
-                                <th class="px-2 py-2 text-right">Sisa</th>
-                                <th class="px-2 py-2 text-right">%</th>
+                                <th class="px-4 py-3 text-right">Sisa</th>
+                                <th class="px-4 py-3 text-right">%</th>
                                 <th
                                     v-for="month in props.budget_vs_actual
                                         .months"
                                     :key="month"
-                                    class="px-2 py-2 text-right"
+                                    class="px-4 py-3 text-right"
                                 >
                                     {{ month }}
                                 </th>
@@ -469,7 +469,7 @@ function expenseChangeTone(value: string): string {
                                 :key="category.category_id"
                                 class="border-b last:border-0"
                             >
-                                <td class="max-w-48 px-2 py-2">
+                                <td class="max-w-48 px-4 py-3">
                                     <div class="flex items-center gap-2">
                                         <span
                                             class="size-2.5 shrink-0 rounded-full"
@@ -483,20 +483,20 @@ function expenseChangeTone(value: string): string {
                                         <Badge
                                             v-if="category.is_over"
                                             variant="destructive"
-                                            class="text-[10px]"
+                                            class="text-2xs"
                                         >
                                             lebih
                                         </Badge>
                                     </div>
                                 </td>
-                                <td class="px-2 py-2 text-right tabular-nums">
+                                <td class="px-4 py-3 text-right tabular-nums">
                                     {{ formatCurrency(category.limit_total) }}
                                 </td>
-                                <td class="px-2 py-2 text-right tabular-nums">
+                                <td class="px-4 py-3 text-right tabular-nums">
                                     {{ formatCurrency(category.used_total) }}
                                 </td>
                                 <td
-                                    class="px-2 py-2 text-right tabular-nums"
+                                    class="px-4 py-3 text-right tabular-nums"
                                     :class="
                                         category.is_over
                                             ? 'text-rose-600 dark:text-rose-400'
@@ -507,14 +507,14 @@ function expenseChangeTone(value: string): string {
                                         formatCurrency(category.remaining_total)
                                     }}
                                 </td>
-                                <td class="px-2 py-2 text-right tabular-nums">
+                                <td class="px-4 py-3 text-right tabular-nums">
                                     {{ percentLabel(category.percent_total) }}
                                 </td>
                                 <td
                                     v-for="month in props.budget_vs_actual
                                         .months"
                                     :key="month"
-                                    class="px-2 py-2 text-right text-xs tabular-nums"
+                                    class="px-4 py-3 text-right text-xs tabular-nums"
                                     :class="
                                         category.cells[month].is_over
                                             ? 'text-rose-600 dark:text-rose-400'
@@ -527,15 +527,15 @@ function expenseChangeTone(value: string): string {
                         </tbody>
                         <tfoot class="text-sm font-semibold">
                             <tr class="border-t">
-                                <td class="px-2 py-2">Total</td>
-                                <td class="px-2 py-2 text-right tabular-nums">
+                                <td class="px-4 py-3">Total</td>
+                                <td class="px-4 py-3 text-right tabular-nums">
                                     {{
                                         formatCurrency(
                                             props.budget_vs_actual.totals.limit,
                                         )
                                     }}
                                 </td>
-                                <td class="px-2 py-2 text-right tabular-nums">
+                                <td class="px-4 py-3 text-right tabular-nums">
                                     {{
                                         formatCurrency(
                                             props.budget_vs_actual.totals.used,
@@ -543,7 +543,7 @@ function expenseChangeTone(value: string): string {
                                     }}
                                 </td>
                                 <td
-                                    class="px-2 py-2 text-right tabular-nums"
+                                    class="px-4 py-3 text-right tabular-nums"
                                     :class="
                                         (toNumber(
                                             props.budget_vs_actual.totals
@@ -560,7 +560,7 @@ function expenseChangeTone(value: string): string {
                                         )
                                     }}
                                 </td>
-                                <td class="px-2 py-2 text-right tabular-nums">
+                                <td class="px-4 py-3 text-right tabular-nums">
                                     {{
                                         percentLabel(
                                             props.budget_vs_actual.totals
@@ -568,7 +568,7 @@ function expenseChangeTone(value: string): string {
                                         )
                                     }}
                                 </td>
-                                <td class="px-2 py-2" />
+                                <td class="px-4 py-3" />
                             </tr>
                         </tfoot>
                     </table>
@@ -580,7 +580,7 @@ function expenseChangeTone(value: string): string {
             v-else-if="activeTab === 'budget'"
             class="rounded-2xl border-0 shadow-neu-flat"
         >
-            <CardContent class="p-5">
+            <CardContent>
                 <p
                     class="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground"
                 >
@@ -595,7 +595,7 @@ function expenseChangeTone(value: string): string {
             v-if="activeTab === 'expense' && props.expense_breakdown.has_data"
             class="rounded-2xl border-0 shadow-neu-flat"
         >
-            <CardContent class="flex flex-col gap-4 p-5">
+            <CardContent class="flex flex-col gap-4">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <h3 class="text-sm font-semibold">
                         Pengeluaran per kategori induk
@@ -615,7 +615,7 @@ function expenseChangeTone(value: string): string {
                                     :key="item.category_id"
                                     class="border-b last:border-0"
                                 >
-                                    <td class="px-2 py-2">
+                                    <td class="px-4 py-3">
                                         <div class="flex items-center gap-2">
                                             <span
                                                 class="size-2.5 shrink-0 rounded-full"
@@ -629,12 +629,12 @@ function expenseChangeTone(value: string): string {
                                         </div>
                                     </td>
                                     <td
-                                        class="px-2 py-2 text-right tabular-nums"
+                                        class="px-4 py-3 text-right tabular-nums"
                                     >
                                         {{ formatCurrency(item.total) }}
                                     </td>
                                     <td
-                                        class="px-2 py-2 text-right text-muted-foreground tabular-nums"
+                                        class="px-4 py-3 text-right text-muted-foreground tabular-nums"
                                     >
                                         {{ expensePercent(item) }}
                                     </td>
@@ -649,12 +649,12 @@ function expenseChangeTone(value: string): string {
                                 class="text-xs text-muted-foreground uppercase"
                             >
                                 <tr class="border-b">
-                                    <th class="px-2 py-2 text-left">Bulan</th>
+                                    <th class="px-4 py-3 text-left">Bulan</th>
                                     <th
                                         v-for="month in props.expense_breakdown
                                             .months"
                                         :key="month"
-                                        class="px-2 py-2 text-right"
+                                        class="px-4 py-3 text-right"
                                     >
                                         {{ month }}
                                     </th>
@@ -667,7 +667,7 @@ function expenseChangeTone(value: string): string {
                                     class="border-b last:border-0"
                                 >
                                     <td
-                                        class="px-2 py-2 text-xs text-muted-foreground"
+                                        class="px-4 py-3 text-xs text-muted-foreground"
                                     >
                                         {{ item.name }}
                                     </td>
@@ -675,7 +675,7 @@ function expenseChangeTone(value: string): string {
                                         v-for="month in props.expense_breakdown
                                             .months"
                                         :key="month"
-                                        class="px-2 py-2 text-right text-xs text-muted-foreground tabular-nums"
+                                        class="px-4 py-3 text-right text-xs text-muted-foreground tabular-nums"
                                     >
                                         {{
                                             formatCurrency(
@@ -685,12 +685,12 @@ function expenseChangeTone(value: string): string {
                                     </td>
                                 </tr>
                                 <tr class="border-t font-medium">
-                                    <td class="px-2 py-2 text-xs">Total</td>
+                                    <td class="px-4 py-3 text-xs">Total</td>
                                     <td
                                         v-for="month in props.expense_breakdown
                                             .months"
                                         :key="month"
-                                        class="px-2 py-2 text-right text-xs tabular-nums"
+                                        class="px-4 py-3 text-right text-xs tabular-nums"
                                     >
                                         {{ formatCurrency(monthTotal(month)) }}
                                     </td>
@@ -711,7 +711,7 @@ function expenseChangeTone(value: string): string {
             v-else-if="activeTab === 'expense'"
             class="rounded-2xl border-0 shadow-neu-flat"
         >
-            <CardContent class="p-5">
+            <CardContent>
                 <p
                     class="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground"
                 >

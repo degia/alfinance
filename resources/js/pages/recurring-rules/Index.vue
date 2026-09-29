@@ -207,7 +207,7 @@ function toggleTag(id: number): void {
             v-if="pending.length > 0"
             class="rounded-2xl border-0 shadow-neu-flat"
         >
-            <CardContent class="p-6">
+            <CardContent>
                 <h3 class="mb-3 text-sm font-semibold">
                     Menunggu konfirmasi ({{ pending.length }})
                 </h3>
@@ -268,8 +268,11 @@ function toggleTag(id: number): void {
             </CardContent>
         </Card>
 
-        <Card v-if="canEdit" class="rounded-2xl border-0 shadow-neu-flat">
-            <CardContent class="p-6">
+        <Card
+            v-if="canEdit"
+            class="w-full max-w-4xl rounded-2xl border-0 shadow-neu-flat"
+        >
+            <CardContent>
                 <div class="mb-4 flex items-center justify-between">
                     <h3 class="text-sm font-semibold">
                         {{ isEditing ? 'Ubah aturan' : 'Tambah aturan' }}
@@ -541,7 +544,7 @@ function toggleTag(id: number): void {
                 :key="rule.id"
                 class="rounded-2xl border-0 shadow-neu-flat"
             >
-                <CardContent class="flex flex-col gap-3 p-5">
+                <CardContent class="flex flex-col gap-3">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <p class="truncate font-medium">
@@ -563,7 +566,7 @@ function toggleTag(id: number): void {
 
                         <Badge
                             :variant="rule.is_active ? 'secondary' : 'outline'"
-                            class="shrink-0 text-[10px]"
+                            class="shrink-0 text-2xs"
                         >
                             {{ rule.is_active ? 'Aktif' : 'Nonaktif' }}
                         </Badge>
@@ -586,7 +589,7 @@ function toggleTag(id: number): void {
                         <Badge
                             v-if="rule.requires_confirmation"
                             variant="outline"
-                            class="text-[10px]"
+                            class="text-2xs"
                         >
                             Butuh konfirmasi
                         </Badge>
@@ -594,7 +597,7 @@ function toggleTag(id: number): void {
                             v-for="tag in rule.tags"
                             :key="tag.id"
                             variant="secondary"
-                            class="text-[10px]"
+                            class="text-2xs"
                         >
                             {{ tag.name }}
                         </Badge>

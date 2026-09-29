@@ -118,7 +118,7 @@ const hasPayments = computed(() => props.payments.length > 0);
                         {{ props.debt.counterparty }}
                     </h2>
                     <Badge
-                        class="text-[10px]"
+                        class="text-2xs"
                         :class="
                             toneClass[props.debt.status_tone] ??
                             toneClass.neutral
@@ -126,7 +126,7 @@ const hasPayments = computed(() => props.payments.length > 0);
                     >
                         {{ props.debt.status_label }}
                     </Badge>
-                    <Badge variant="outline" class="text-[10px]">
+                    <Badge variant="outline" class="text-2xs">
                         {{ props.debt.direction_label }}
                     </Badge>
                 </div>
@@ -158,9 +158,9 @@ const hasPayments = computed(() => props.payments.length > 0);
             </div>
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="p-5">
+                <CardContent>
                     <p
                         class="text-xs tracking-wide text-muted-foreground uppercase"
                     >
@@ -172,7 +172,7 @@ const hasPayments = computed(() => props.payments.length > 0);
                 </CardContent>
             </Card>
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="p-5">
+                <CardContent>
                     <p
                         class="text-xs tracking-wide text-muted-foreground uppercase"
                     >
@@ -184,7 +184,7 @@ const hasPayments = computed(() => props.payments.length > 0);
                 </CardContent>
             </Card>
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="p-5">
+                <CardContent>
                     <p
                         class="text-xs tracking-wide text-muted-foreground uppercase"
                     >
@@ -204,7 +204,7 @@ const hasPayments = computed(() => props.payments.length > 0);
         </div>
 
         <Card class="rounded-2xl border-0 shadow-neu-flat">
-            <CardContent class="flex flex-col gap-4 p-5">
+            <CardContent class="flex flex-col gap-4">
                 <div class="flex items-center justify-between gap-3">
                     <h3 class="text-sm font-semibold">Riwayat cicilan</h3>
                     <Button size="sm" class="gap-2" @click="openPayment">
@@ -244,7 +244,7 @@ const hasPayments = computed(() => props.payments.length > 0);
         </Card>
 
         <Dialog v-model:open="isPaymentOpen">
-            <DialogContent>
+            <DialogContent class="sm:max-w-xl">
                 <DialogHeader>
                     <DialogTitle>Catat cicilan</DialogTitle>
                     <DialogDescription>

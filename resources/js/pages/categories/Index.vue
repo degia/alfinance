@@ -113,8 +113,8 @@ function remove(id: number): void {
             description="Dua level: kategori induk dan sub-kategori. Ikon dan warna dipakai ulang di chart dan badge."
         />
 
-        <Card class="rounded-2xl border-0 shadow-neu-flat">
-            <CardContent class="p-6">
+        <Card class="w-full max-w-4xl rounded-2xl border-0 shadow-neu-flat">
+            <CardContent>
                 <div class="mb-4 flex items-center justify-between">
                     <h3 class="text-sm font-semibold">
                         {{ isEditing ? 'Ubah kategori' : 'Tambah kategori' }}
@@ -261,7 +261,7 @@ function remove(id: number): void {
             :key="category.id"
             class="rounded-2xl border-0 shadow-neu-flat"
         >
-            <CardContent class="flex flex-col gap-3 p-5">
+            <CardContent class="flex flex-col gap-3">
                 <div class="flex items-center justify-between gap-3">
                     <div class="flex min-w-0 items-center gap-3">
                         <span
@@ -274,7 +274,7 @@ function remove(id: number): void {
                             <CategoryIcon :icon="category.icon" />
                         </span>
                         <p class="truncate font-medium">{{ category.name }}</p>
-                        <Badge variant="secondary" class="text-[10px]">
+                        <Badge variant="secondary" class="text-2xs">
                             {{ category.children.length }} sub
                         </Badge>
                     </div>

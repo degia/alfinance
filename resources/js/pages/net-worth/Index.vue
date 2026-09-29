@@ -283,13 +283,13 @@ watch(resolvedAppearance, renderChart);
             description="Aset dan kewajiban hari ini. Angka tren dibaca dari snapshot bulanan, bukan dihitung ulang dari transaksi."
         />
 
-        <div class="grid gap-4 sm:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card
                 v-for="card in summaryCards"
                 :key="card.label"
                 class="rounded-2xl border-0 shadow-neu-flat"
             >
-                <CardContent class="p-5">
+                <CardContent>
                     <p
                         class="text-xs tracking-wide text-muted-foreground uppercase"
                     >
@@ -330,7 +330,7 @@ watch(resolvedAppearance, renderChart);
         </div>
 
         <Card class="rounded-2xl border-0 shadow-neu-flat">
-            <CardContent class="flex flex-col gap-4 p-5">
+            <CardContent class="flex flex-col gap-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div class="flex items-center gap-2">
                         <h3 class="text-sm font-semibold">
@@ -391,7 +391,7 @@ watch(resolvedAppearance, renderChart);
                 :key="group.title"
                 class="rounded-2xl border-0 shadow-neu-flat"
             >
-                <CardContent class="flex flex-col gap-3 p-5">
+                <CardContent class="flex flex-col gap-3">
                     <h3 class="text-sm font-semibold">{{ group.title }}</h3>
 
                     <p
@@ -450,10 +450,10 @@ watch(resolvedAppearance, renderChart);
             v-if="props.credit_cards.length > 0"
             class="rounded-2xl border-0 shadow-neu-flat"
         >
-            <CardContent class="flex flex-col gap-3 p-5">
+            <CardContent class="flex flex-col gap-3">
                 <h3 class="text-sm font-semibold">
                     Utang kartu kredit
-                    <Badge variant="secondary" class="ml-2 text-[10px]">
+                    <Badge variant="secondary" class="ml-2 text-2xs">
                         otomatis
                     </Badge>
                 </h3>
@@ -478,7 +478,7 @@ watch(resolvedAppearance, renderChart);
         </Card>
 
         <Dialog v-model:open="isFormOpen">
-            <DialogContent>
+            <DialogContent class="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
                         {{ editingId === null ? 'Tambah item' : 'Ubah item' }}

@@ -423,6 +423,7 @@ watch(resolvedAppearance, () => {
     <div class="flex flex-col gap-6">
         <div class="flex flex-wrap items-end justify-between gap-3">
             <Heading
+                :spaced="false"
                 title="Dashboard"
                 description="Ringkasan kondisi keuangan. Semua angka dibaca dari snapshot bulanan, bukan dihitung ulang dari transaksi."
             />
@@ -476,14 +477,14 @@ watch(resolvedAppearance, () => {
                 :key="card.key"
                 class="rounded-2xl border-0 shadow-neu-flat"
             >
-                <CardContent class="p-5">
+                <CardContent>
                     <p
                         class="text-xs tracking-wide text-muted-foreground uppercase"
                     >
                         {{ card.label }}
                     </p>
                     <p
-                        class="mt-1 text-2xl font-semibold"
+                        class="mt-1 text-xl font-semibold"
                         :class="
                             card.key === 'net_cash_flow' ? netCashFlowTone : ''
                         "
@@ -513,13 +514,13 @@ watch(resolvedAppearance, () => {
             </Card>
 
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="p-5">
+                <CardContent>
                     <p
                         class="text-xs tracking-wide text-muted-foreground uppercase"
                     >
                         Saldo total
                     </p>
-                    <p class="mt-1 text-2xl font-semibold">
+                    <p class="mt-1 text-xl font-semibold">
                         {{ formatCurrency(props.kpi.total_balance) }}
                     </p>
                     <p class="mt-1 text-xs text-muted-foreground">
@@ -539,7 +540,7 @@ watch(resolvedAppearance, () => {
 
         <div class="grid gap-4 lg:grid-cols-3">
             <Card class="rounded-2xl border-0 shadow-neu-flat lg:col-span-2">
-                <CardContent class="flex flex-col gap-4 p-5">
+                <CardContent class="flex flex-col gap-4">
                     <div
                         class="flex flex-wrap items-center justify-between gap-2"
                     >
@@ -573,7 +574,7 @@ watch(resolvedAppearance, () => {
             </Card>
 
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="flex flex-col gap-4 p-5">
+                <CardContent class="flex flex-col gap-4">
                     <div class="flex items-center justify-between gap-2">
                         <h3 class="text-sm font-semibold">
                             Komposisi pengeluaran
@@ -629,7 +630,7 @@ watch(resolvedAppearance, () => {
 
         <div class="grid gap-4 lg:grid-cols-3">
             <Card class="rounded-2xl border-0 shadow-neu-flat lg:col-span-1">
-                <CardContent class="flex flex-col gap-4 p-5">
+                <CardContent class="flex flex-col gap-4">
                     <div class="flex items-center justify-between gap-2">
                         <h3
                             class="flex items-center gap-2 text-sm font-semibold"
@@ -723,7 +724,7 @@ watch(resolvedAppearance, () => {
             </Card>
 
             <Card class="rounded-2xl border-0 shadow-neu-flat lg:col-span-2">
-                <CardContent class="flex flex-col gap-3 p-5">
+                <CardContent class="flex flex-col gap-3">
                     <h3 class="text-sm font-semibold">Transaksi terakhir</h3>
 
                     <p
@@ -760,7 +761,7 @@ watch(resolvedAppearance, () => {
                                 <Badge
                                     v-if="transaction.is_transfer"
                                     variant="outline"
-                                    class="text-[10px]"
+                                    class="text-2xs"
                                 >
                                     transfer
                                 </Badge>

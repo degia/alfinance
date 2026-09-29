@@ -94,19 +94,19 @@ function dueHint(dueDate: string | null, daysUntilDue: number | null): string {
             description="Sisa dana yang harus dibayar dan yang harus ditagih. Utang yang sudah punya riwayat pembayaran tidak bisa dihapus — tandai lunas dengan mencatat cicilan terakhir."
         />
 
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Card
                 v-for="card in summaryCards"
                 :key="card.label"
                 class="rounded-2xl border-0 shadow-neu-flat"
             >
-                <CardContent class="p-5">
+                <CardContent>
                     <p
                         class="text-xs tracking-wide text-muted-foreground uppercase"
                     >
                         {{ card.label }}
                     </p>
-                    <p class="mt-1 text-lg font-semibold">
+                    <p class="mt-1 text-xl font-semibold">
                         {{ formatCurrency(card.value) }}
                     </p>
                     <p class="mt-1 text-xs text-muted-foreground">
@@ -158,7 +158,7 @@ function dueHint(dueDate: string | null, daysUntilDue: number | null): string {
             :key="debt.id"
             class="rounded-2xl border-0 shadow-neu-flat"
         >
-            <CardContent class="flex flex-col gap-4 p-5">
+            <CardContent class="flex flex-col gap-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="min-w-0">
                         <div class="flex items-center gap-2">
@@ -166,7 +166,7 @@ function dueHint(dueDate: string | null, daysUntilDue: number | null): string {
                                 {{ debt.counterparty }}
                             </h3>
                             <Badge
-                                class="text-[10px]"
+                                class="text-2xs"
                                 :class="
                                     toneClass[debt.status_tone] ??
                                     toneClass.neutral
@@ -174,7 +174,7 @@ function dueHint(dueDate: string | null, daysUntilDue: number | null): string {
                             >
                                 {{ debt.status_label }}
                             </Badge>
-                            <Badge variant="outline" class="text-[10px]">
+                            <Badge variant="outline" class="text-2xs">
                                 {{ debt.direction_label }}
                             </Badge>
                         </div>
@@ -187,7 +187,7 @@ function dueHint(dueDate: string | null, daysUntilDue: number | null): string {
                     </div>
 
                     <div class="text-right">
-                        <p class="text-lg font-semibold">
+                        <p class="text-xl font-semibold">
                             {{ formatCurrency(debt.remaining) }}
                         </p>
                         <p class="text-xs text-muted-foreground">

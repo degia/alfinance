@@ -56,7 +56,7 @@ function leave(id: number): void {
 <template>
     <Head title="Pilih workspace" />
 
-    <div class="mx-auto flex w-full max-w-3xl flex-col gap-8">
+    <div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <div class="flex flex-col items-center gap-4 text-center">
             <AppLogo class="h-auto w-auto" />
 
@@ -73,7 +73,7 @@ function leave(id: number): void {
             v-if="workspaces.length > 0"
             class="rounded-2xl border-0 shadow-neu-flat"
         >
-            <CardContent class="flex flex-col gap-3 p-4">
+            <CardContent class="flex flex-col gap-3">
                 <button
                     v-for="item in workspaces"
                     :key="item.id"
@@ -93,7 +93,7 @@ function leave(id: number): void {
                             <span class="truncate font-medium">
                                 {{ item.name }}
                             </span>
-                            <Badge variant="secondary" class="text-[10px]">
+                            <Badge variant="secondary" class="text-2xs">
                                 {{ roleLabels[item.role] }}
                             </Badge>
                         </span>
@@ -120,14 +120,14 @@ function leave(id: number): void {
         </Card>
 
         <Card v-else class="rounded-2xl border-0 shadow-neu-flat">
-            <CardContent class="p-6 text-center text-sm text-muted-foreground">
+            <CardContent class="text-center text-sm text-muted-foreground">
                 Kamu belum punya workspace. Buat satu untuk mulai mencatat
                 keuangan.
             </CardContent>
         </Card>
 
         <Card class="rounded-2xl border-0 shadow-neu-flat">
-            <CardContent class="p-6">
+            <CardContent>
                 <form class="flex flex-col gap-4" @submit.prevent="submit">
                     <div class="grid gap-2">
                         <Label for="workspace-name">

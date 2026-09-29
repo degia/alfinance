@@ -161,7 +161,7 @@ function creditTone(percent: number): string {
             </div>
 
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="flex items-center gap-2 px-4 py-3">
+                <CardContent class="flex items-center gap-2">
                     <Wallet class="size-4 text-primary" />
                     <span class="text-xs text-muted-foreground"
                         >Total saldo</span
@@ -173,8 +173,8 @@ function creditTone(percent: number): string {
             </Card>
         </div>
 
-        <Card class="rounded-2xl border-0 shadow-neu-flat">
-            <CardContent class="p-6">
+        <Card class="w-full max-w-4xl rounded-2xl border-0 shadow-neu-flat">
+            <CardContent>
                 <div class="mb-4 flex items-center justify-between">
                     <h3 class="text-sm font-semibold">
                         {{ isEditing ? 'Ubah akun' : 'Tambah akun' }}
@@ -356,7 +356,7 @@ function creditTone(percent: number): string {
                 :key="account.id"
                 class="rounded-2xl border-0 shadow-neu-flat"
             >
-                <CardContent class="flex flex-col gap-4 p-5">
+                <CardContent class="flex flex-col gap-4">
                     <div class="flex items-start justify-between gap-3">
                         <div class="flex min-w-0 items-center gap-3">
                             <span
@@ -377,7 +377,7 @@ function creditTone(percent: number): string {
                         <Badge
                             v-if="account.is_archived"
                             variant="secondary"
-                            class="shrink-0 text-[10px]"
+                            class="shrink-0 text-2xs"
                         >
                             Diarsipkan
                         </Badge>
@@ -386,7 +386,7 @@ function creditTone(percent: number): string {
                     <div>
                         <p class="text-xs text-muted-foreground">Saldo</p>
                         <p
-                            class="text-lg font-semibold tabular-nums"
+                            class="text-xl font-semibold tabular-nums"
                             :class="
                                 Number(account.cached_balance) < 0
                                     ? 'text-expense'

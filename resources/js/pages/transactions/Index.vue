@@ -233,10 +233,14 @@ function typeIcon(type: TransactionType) {
 
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="p-5">
-                    <p class="text-xs text-muted-foreground">Pemasukan</p>
+                <CardContent>
                     <p
-                        class="mt-1 text-lg font-semibold text-income tabular-nums"
+                        class="text-xs tracking-wide text-muted-foreground uppercase"
+                    >
+                        Pemasukan
+                    </p>
+                    <p
+                        class="mt-1 text-xl font-semibold text-income tabular-nums"
                     >
                         {{ formatCurrency(summary.income) }}
                     </p>
@@ -244,10 +248,14 @@ function typeIcon(type: TransactionType) {
             </Card>
 
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="p-5">
-                    <p class="text-xs text-muted-foreground">Pengeluaran</p>
+                <CardContent>
                     <p
-                        class="mt-1 text-lg font-semibold text-expense tabular-nums"
+                        class="text-xs tracking-wide text-muted-foreground uppercase"
+                    >
+                        Pengeluaran
+                    </p>
+                    <p
+                        class="mt-1 text-xl font-semibold text-expense tabular-nums"
                     >
                         {{ formatCurrency(summary.expense) }}
                     </p>
@@ -255,12 +263,14 @@ function typeIcon(type: TransactionType) {
             </Card>
 
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="p-5">
-                    <p class="text-xs text-muted-foreground">
+                <CardContent>
+                    <p
+                        class="text-xs tracking-wide text-muted-foreground uppercase"
+                    >
                         Bersih (pemasukan − pengeluaran)
                     </p>
                     <p
-                        class="mt-1 text-lg font-semibold tabular-nums"
+                        class="mt-1 text-xl font-semibold tabular-nums"
                         :class="
                             Number(summary.net) < 0
                                 ? 'text-expense'
@@ -273,11 +283,13 @@ function typeIcon(type: TransactionType) {
             </Card>
 
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="p-5">
-                    <p class="text-xs text-muted-foreground">
+                <CardContent>
+                    <p
+                        class="text-xs tracking-wide text-muted-foreground uppercase"
+                    >
                         Menunggu konfirmasi
                     </p>
-                    <p class="mt-1 text-lg font-semibold tabular-nums">
+                    <p class="mt-1 text-xl font-semibold tabular-nums">
                         {{ summary.pending_count }}
                     </p>
                 </CardContent>
@@ -319,7 +331,7 @@ function typeIcon(type: TransactionType) {
         </div>
 
         <Card v-if="showFilters" class="rounded-2xl border-0 shadow-neu-flat">
-            <CardContent class="grid gap-4 p-6 md:grid-cols-3">
+            <CardContent class="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
                 <div class="grid gap-2">
                     <Label for="filter-search">Cari catatan</Label>
                     <Input
@@ -470,7 +482,9 @@ function typeIcon(type: TransactionType) {
                     />
                 </div>
 
-                <div class="flex items-end justify-end gap-2 md:col-span-3">
+                <div
+                    class="flex items-end justify-end gap-2 md:col-span-3 xl:col-span-5"
+                >
                     <Button variant="ghost" @click="resetFilters">Reset</Button>
                     <Button @click="applyFilters()">Terapkan</Button>
                 </div>
@@ -488,7 +502,7 @@ function typeIcon(type: TransactionType) {
             }}
         </div>
 
-        <Card class="rounded-2xl border-0 shadow-neu-flat">
+        <Card class="rounded-2xl border-0 py-0 shadow-neu-flat">
             <CardContent class="p-0">
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-3xl text-sm">
@@ -575,7 +589,7 @@ function typeIcon(type: TransactionType) {
                                             v-for="tag in transaction.tags"
                                             :key="tag.id"
                                             variant="secondary"
-                                            class="text-[10px]"
+                                            class="text-2xs"
                                         >
                                             {{ tag.name }}
                                         </Badge>
@@ -583,7 +597,7 @@ function typeIcon(type: TransactionType) {
                                             v-for="attachment in transaction.attachments"
                                             :key="attachment.id"
                                             :href="attachment.url"
-                                            class="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground"
+                                            class="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground hover:text-foreground"
                                         >
                                             <Paperclip class="size-3" />
                                             {{ attachment.original_name }}
@@ -612,7 +626,7 @@ function typeIcon(type: TransactionType) {
                                     >
                                         <Badge
                                             variant="outline"
-                                            class="text-[10px]"
+                                            class="text-2xs"
                                         >
                                             Menunggu
                                         </Badge>

@@ -105,7 +105,7 @@ function manageWorkspaces(): void {
                     <Badge
                         v-if="item.is_active"
                         variant="secondary"
-                        class="text-[10px]"
+                        class="text-2xs"
                     >
                         Aktif
                     </Badge>

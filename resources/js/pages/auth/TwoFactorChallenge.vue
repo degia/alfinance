@@ -54,14 +54,14 @@ const toggleRecoveryMode = (clearErrors: () => void): void => {
         <template v-if="!showRecoveryInput">
             <Form
                 v-bind="store.form()"
-                class="space-y-4"
+                class="flex flex-col gap-6"
                 reset-on-error
                 @error="code = ''"
                 #default="{ errors, processing, clearErrors }"
             >
                 <input type="hidden" name="code" :value="code" />
                 <div
-                    class="flex flex-col items-center justify-center space-y-3 text-center"
+                    class="flex flex-col items-center justify-center gap-3 text-center"
                 >
                     <div class="flex w-full items-center justify-center">
                         <InputOTP
@@ -101,18 +101,20 @@ const toggleRecoveryMode = (clearErrors: () => void): void => {
         <template v-else>
             <Form
                 v-bind="store.form()"
-                class="space-y-4"
+                class="flex flex-col gap-6"
                 reset-on-error
                 #default="{ errors, processing, clearErrors }"
             >
-                <Input
-                    name="recovery_code"
-                    type="text"
-                    placeholder="Enter recovery code"
-                    v-focus
-                    required
-                />
-                <InputError :message="errors.recovery_code" />
+                <div class="grid gap-2">
+                    <Input
+                        name="recovery_code"
+                        type="text"
+                        placeholder="Enter recovery code"
+                        v-focus
+                        required
+                    />
+                    <InputError :message="errors.recovery_code" />
+                </div>
                 <Button type="submit" class="w-full" :disabled="processing"
                     >Continue</Button
                 >

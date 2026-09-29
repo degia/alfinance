@@ -101,6 +101,26 @@
 | Dark mode meng-override nilai ini di blok `.dark` bawah.
 */
 @theme {
+    /*
+      | Lebar kolom konten — cap untuk area konten utama di layout sidebar.
+      | Dipakai tepat dua kali (`AppSidebarLayout.vue` dan
+      | `AppSidebarHeader.vue`) dengan gutter yang sama supaya header dan isi
+      | halaman selalu rata kiri: di bawah cap konten mengikuti lebar area
+      | (minus gutter), di atas cap konten terpusat. Nilai 100rem dipilih agar
+      | tabel lebar (`min-w-3xl`, matriks anggaran `min-w-[56rem]`) tidak
+      | memicu scroll horizontal pada monitor 1440p.
+     */
+    --container-app: 100rem;
+
+    /*
+      | Ukuran teks mikro untuk baris meta di bawah label/header tabel, chip,
+      | dan anotasi kartu. Sebelumnya ditulis langsung sebagai `text-[10px]` /
+      | `text-[11px]` di 24 titik sehingga ukurannya menyimpang antar halaman;
+      | token ini menutup celah itu.
+     */
+    --text-2xs: 0.625rem;
+    --text-2xs--line-height: 1.4;
+
     --shadow-neu-flat:
         -5px -5px 10px var(--neu-light), 5px 5px 10px var(--neu-dark);
     --shadow-neu-flat-sm:
@@ -179,7 +199,7 @@
     --destructive-foreground: hsl(0 0% 100%);
     /*
       Warna latar tombol "danger". Dipisah dari `--destructive` karena satu
-      token tidak mungkin sekaligus|miemen 4.5:1 untuk teks putih di atasnya
+      token tidak mungkin sekaligus memenuhi 4.5:1 untuk teks putih di atasnya
       (4.66) dan 4.5:1 sebagai teks di atas background terang (4.59) — jadi
       mode terang memakai nilai yang sama, mode gelap memakai nilai lebih
       gelap khusus untuk bidang solid.

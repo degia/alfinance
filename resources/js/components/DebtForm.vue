@@ -66,9 +66,9 @@ function submit(): void {
 </script>
 
 <template>
-    <Card class="rounded-2xl border-0 shadow-neu-flat">
-        <CardContent class="p-6">
-            <form class="flex flex-col gap-5" @submit.prevent="submit">
+    <Card class="w-full max-w-4xl rounded-2xl border-0 shadow-neu-flat">
+        <CardContent>
+            <form class="flex flex-col gap-4" @submit.prevent="submit">
                 <div class="grid gap-4 md:grid-cols-2">
                     <div class="grid gap-2">
                         <Label for="debt-direction">Tipe</Label>

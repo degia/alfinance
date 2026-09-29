@@ -74,8 +74,8 @@ function remove(id: number): void {
             description="Tag bebas untuk menandai transaksi, misalnya “liburan” atau “proyek A”."
         />
 
-        <Card class="rounded-2xl border-0 shadow-neu-flat">
-            <CardContent class="p-6">
+        <Card class="w-full max-w-xl rounded-2xl border-0 shadow-neu-flat">
+            <CardContent>
                 <div class="mb-4 flex items-center justify-between">
                     <h3 class="text-sm font-semibold">
                         {{ isEditing ? 'Ubah tag' : 'Tambah tag' }}

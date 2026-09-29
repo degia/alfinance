@@ -155,15 +155,16 @@ function submit(): void {
 </script>
 
 <template>
-    <Card class="rounded-2xl border-0 shadow-neu-flat">
-        <CardContent class="p-6">
+    <Card class="w-full max-w-4xl rounded-2xl border-0 shadow-neu-flat">
+        <CardContent>
             <div class="mb-4 flex items-center justify-between gap-3">
                 <Heading
+                    :spaced="false"
                     :title="headingTitle"
                     :description="headingDescription"
                 />
 
-                <Badge variant="outline" class="shrink-0 text-[10px]">
+                <Badge variant="outline" class="shrink-0 text-2xs">
                     Maks 2 MB · jpg/png/webp/pdf
                 </Badge>
             </div>

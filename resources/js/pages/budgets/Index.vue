@@ -142,13 +142,13 @@ const summaryCards = computed(() => [
             description="Batas belanja per kategori dan per bulan. Angka terpakai berasal dari cache, jadi halaman ini tidak pernah menghitung ulang dari ribuan transaksi."
         />
 
-        <div class="grid gap-4 sm:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card
                 v-for="card in summaryCards"
                 :key="card.label"
                 class="rounded-2xl border-0 shadow-neu-flat"
             >
-                <CardContent class="p-5">
+                <CardContent>
                     <p
                         class="text-xs tracking-wide text-muted-foreground uppercase"
                     >
@@ -165,7 +165,7 @@ const summaryCards = computed(() => [
         </div>
 
         <Card class="rounded-2xl border-0 shadow-neu-flat">
-            <CardContent class="flex flex-col gap-4 p-5">
+            <CardContent class="flex flex-col gap-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div class="flex items-center gap-2">
                         <Button
@@ -225,12 +225,12 @@ const summaryCards = computed(() => [
 
                 <div v-else class="overflow-x-auto">
                     <table
-                        class="w-full min-w-[64rem] border-separate border-spacing-0 text-sm"
+                        class="w-full min-w-[56rem] border-separate border-spacing-0 text-sm"
                     >
                         <thead>
                             <tr>
                                 <th
-                                    class="sticky left-0 z-10 bg-background px-3 py-2 text-left font-medium text-muted-foreground"
+                                    class="sticky left-0 z-10 bg-card px-3 py-2 text-left font-medium text-muted-foreground"
                                 >
                                     Kategori
                                 </th>
@@ -251,7 +251,7 @@ const summaryCards = computed(() => [
                         <tbody>
                             <tr v-for="row in props.categories" :key="row.id">
                                 <th
-                                    class="sticky left-0 z-10 bg-background px-3 py-1.5 text-left font-medium whitespace-nowrap"
+                                    class="sticky left-0 z-10 bg-card px-3 py-2 text-left font-medium whitespace-nowrap"
                                     :class="
                                         row.is_nested
                                             ? 'pl-6 font-normal text-muted-foreground'
@@ -273,10 +273,10 @@ const summaryCards = computed(() => [
                                 <td
                                     v-for="cell in row.months"
                                     :key="cell.month"
-                                    class="px-1 py-1 text-center align-middle"
+                                    class="px-2 py-2 text-center align-middle"
                                 >
                                     <div
-                                        class="neu-inset flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1"
+                                        class="neu-inset flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5"
                                         :class="
                                             cell.month === props.month
                                                 ? 'ring-1 ring-primary/40'
@@ -285,7 +285,7 @@ const summaryCards = computed(() => [
                                     >
                                         <template v-if="cell.limit !== null">
                                             <span
-                                                class="text-[11px] text-muted-foreground"
+                                                class="text-2xs text-muted-foreground"
                                             >
                                                 {{ formatCurrency(cell.used) }}
                                                 /{{
@@ -310,7 +310,7 @@ const summaryCards = computed(() => [
                                                 />
                                             </span>
                                             <span
-                                                class="text-[10px] font-medium"
+                                                class="text-2xs font-medium"
                                                 :class="
                                                     statusTone[cell.status].text
                                                 "
@@ -325,7 +325,7 @@ const summaryCards = computed(() => [
 
                                         <template v-else>
                                             <span
-                                                class="text-[11px] text-muted-foreground"
+                                                class="text-2xs text-muted-foreground"
                                             >
                                                 {{
                                                     cell.used === '0.00'
@@ -337,7 +337,7 @@ const summaryCards = computed(() => [
                                             </span>
                                             <button
                                                 type="button"
-                                                class="neu-color rounded text-[10px] text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                                class="neu-color rounded text-2xs text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                                 @click="
                                                     openCreate(
                                                         cell.month,

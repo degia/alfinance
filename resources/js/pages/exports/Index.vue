@@ -360,30 +360,42 @@ function isPendingRow(row: ExportRow): boolean {
             </AlertDescription>
         </Alert>
 
-        <div class="grid gap-4 sm:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="p-5">
-                    <p class="text-xs text-muted-foreground">Sedang diproses</p>
-                    <p class="mt-1 text-lg font-semibold tabular-nums">
+                <CardContent>
+                    <p
+                        class="text-xs tracking-wide text-muted-foreground uppercase"
+                    >
+                        Sedang diproses
+                    </p>
+                    <p class="mt-1 text-xl font-semibold tabular-nums">
                         {{ exportSummary.queued }}
                     </p>
                 </CardContent>
             </Card>
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="p-5">
-                    <p class="text-xs text-muted-foreground">Selesai</p>
+                <CardContent>
                     <p
-                        class="mt-1 text-lg font-semibold text-income tabular-nums"
+                        class="text-xs tracking-wide text-muted-foreground uppercase"
+                    >
+                        Selesai
+                    </p>
+                    <p
+                        class="mt-1 text-xl font-semibold text-income tabular-nums"
                     >
                         {{ exportSummary.done }}
                     </p>
                 </CardContent>
             </Card>
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="p-5">
-                    <p class="text-xs text-muted-foreground">Gagal</p>
+                <CardContent>
                     <p
-                        class="mt-1 text-lg font-semibold text-expense tabular-nums"
+                        class="text-xs tracking-wide text-muted-foreground uppercase"
+                    >
+                        Gagal
+                    </p>
+                    <p
+                        class="mt-1 text-xl font-semibold text-expense tabular-nums"
                     >
                         {{ exportSummary.failed }}
                     </p>
@@ -393,7 +405,7 @@ function isPendingRow(row: ExportRow): boolean {
 
         <div class="grid gap-6 xl:grid-cols-2">
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="flex flex-col gap-4 p-6">
+                <CardContent class="flex flex-col gap-4">
                     <div class="flex items-center gap-2">
                         <Download class="size-4 text-muted-foreground" />
                         <h2 class="text-sm font-semibold">Buat ekspor</h2>
@@ -616,7 +628,7 @@ function isPendingRow(row: ExportRow): boolean {
             </Card>
 
             <Card class="rounded-2xl border-0 shadow-neu-flat">
-                <CardContent class="flex flex-col gap-4 p-6">
+                <CardContent class="flex flex-col gap-4">
                     <div class="flex items-center gap-2">
                         <Database class="size-4 text-muted-foreground" />
                         <h2 class="text-sm font-semibold">Buat backup</h2>
@@ -688,16 +700,16 @@ function isPendingRow(row: ExportRow): boolean {
             </Card>
         </div>
 
-        <Card class="rounded-2xl border-0 shadow-neu-flat">
+        <Card class="rounded-2xl border-0 py-0 shadow-neu-flat">
             <CardContent class="p-0">
-                <div class="flex items-center gap-2 p-5">
+                <div class="flex items-center gap-2 px-6 pt-6">
                     <FileSpreadsheet class="size-4 text-muted-foreground" />
                     <h2 class="text-sm font-semibold">Riwayat ekspor</h2>
                 </div>
 
                 <div
                     v-if="props.exports.length === 0"
-                    class="px-5 pb-10 text-center text-sm text-muted-foreground"
+                    class="mt-6 px-6 pb-6 text-center text-sm text-muted-foreground"
                 >
                     Belum ada ekspor. Pilih jenis berkas di atas untuk membuat
                     yang pertama.
@@ -797,16 +809,16 @@ function isPendingRow(row: ExportRow): boolean {
             </CardContent>
         </Card>
 
-        <Card class="rounded-2xl border-0 shadow-neu-flat">
+        <Card class="rounded-2xl border-0 py-0 shadow-neu-flat">
             <CardContent class="p-0">
-                <div class="flex items-center gap-2 p-5">
+                <div class="flex items-center gap-2 px-6 pt-6">
                     <Database class="size-4 text-muted-foreground" />
                     <h2 class="text-sm font-semibold">Riwayat backup</h2>
                 </div>
 
                 <div
                     v-if="props.backups.length === 0"
-                    class="px-5 pb-10 text-center text-sm text-muted-foreground"
+                    class="mt-6 px-6 pb-6 text-center text-sm text-muted-foreground"
                 >
                     Belum ada backup. Buat satu untuk menyimpan salinan data
                     workspace ini.
@@ -943,7 +955,7 @@ function isPendingRow(row: ExportRow): boolean {
         </Alert>
 
         <Dialog :open="isDiffOpen" @update:open="isDiffOpen = $event">
-            <DialogContent class="max-w-2xl">
+            <DialogContent class="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Pratinjau pemulihan (dry-run)</DialogTitle>
                     <DialogDescription>
@@ -992,20 +1004,32 @@ function isPendingRow(row: ExportRow): boolean {
                                 <tr
                                     class="border-b text-left text-xs text-muted-foreground"
                                 >
-                                    <th class="py-2 font-medium">Bagian</th>
-                                    <th class="py-2 text-right font-medium">
+                                    <th class="px-4 py-3 font-medium">
+                                        Bagian
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-right font-medium"
+                                    >
                                         Sekarang
                                     </th>
-                                    <th class="py-2 text-right font-medium">
+                                    <th
+                                        class="px-4 py-3 text-right font-medium"
+                                    >
                                         Di backup
                                     </th>
-                                    <th class="py-2 text-right font-medium">
+                                    <th
+                                        class="px-4 py-3 text-right font-medium"
+                                    >
                                         Baru
                                     </th>
-                                    <th class="py-2 text-right font-medium">
+                                    <th
+                                        class="px-4 py-3 text-right font-medium"
+                                    >
                                         Timpa
                                     </th>
-                                    <th class="py-2 text-right font-medium">
+                                    <th
+                                        class="px-4 py-3 text-right font-medium"
+                                    >
                                         Lewati
                                     </th>
                                 </tr>
@@ -1016,22 +1040,32 @@ function isPendingRow(row: ExportRow): boolean {
                                     :key="section.key"
                                     class="border-b last:border-0"
                                 >
-                                    <td class="py-2 font-medium">
+                                    <td class="px-4 py-3 font-medium">
                                         {{ section.label }}
                                     </td>
-                                    <td class="py-2 text-right tabular-nums">
+                                    <td
+                                        class="px-4 py-3 text-right tabular-nums"
+                                    >
                                         {{ section.stats.current }}
                                     </td>
-                                    <td class="py-2 text-right tabular-nums">
+                                    <td
+                                        class="px-4 py-3 text-right tabular-nums"
+                                    >
                                         {{ section.stats.payload }}
                                     </td>
-                                    <td class="py-2 text-right tabular-nums">
+                                    <td
+                                        class="px-4 py-3 text-right tabular-nums"
+                                    >
                                         {{ section.stats.create }}
                                     </td>
-                                    <td class="py-2 text-right tabular-nums">
+                                    <td
+                                        class="px-4 py-3 text-right tabular-nums"
+                                    >
                                         {{ section.stats.replace }}
                                     </td>
-                                    <td class="py-2 text-right tabular-nums">
+                                    <td
+                                        class="px-4 py-3 text-right tabular-nums"
+                                    >
                                         {{ section.stats.skip }}
                                     </td>
                                 </tr>
@@ -1049,7 +1083,7 @@ function isPendingRow(row: ExportRow): boolean {
         </Dialog>
 
         <Dialog :open="isRestoreOpen" @update:open="isRestoreOpen = $event">
-            <DialogContent class="max-w-md">
+            <DialogContent class="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Pulihkan backup ini?</DialogTitle>
                     <DialogDescription>
