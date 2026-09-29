@@ -396,6 +396,9 @@ function typeIcon(type: TransactionType) {
                                 v-for="category in options.categories"
                                 :key="category.id"
                                 :value="String(category.id)"
+                                :class="
+                                    category.parent_id === null ? '' : 'pl-6'
+                                "
                             >
                                 {{ category.name }}
                             </SelectItem>
@@ -571,9 +574,21 @@ function typeIcon(type: TransactionType) {
                                     </div>
                                 </td>
                                 <td class="px-4 py-3">
-                                    <p v-if="transaction.category">
-                                        {{ transaction.category.name }}
-                                    </p>
+                                    <template v-if="transaction.category">
+                                        <p
+                                            v-if="
+                                                transaction.category.parent_name
+                                            "
+                                            class="truncate text-xs text-muted-foreground"
+                                        >
+                                            {{
+                                                transaction.category.parent_name
+                                            }}
+                                        </p>
+                                        <p class="truncate">
+                                            {{ transaction.category.name }}
+                                        </p>
+                                    </template>
                                     <p v-else class="text-muted-foreground">
                                         —
                                     </p>

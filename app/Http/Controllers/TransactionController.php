@@ -72,10 +72,14 @@ class TransactionController extends Controller
             // (ARCHITECTURE.md §2.1 butir 5: N+1 dilarang). Kolom yang
             // dipilih persis yang dipakai payload; `tags` boleh tanpa kolom
             // pivot karena `BelongsToMany` menambahkannya sendiri.
+            // `category.parent` menambah satu query untuk seluruh halaman,
+            // bukan satu per baris, supaya tabel bisa menulis
+            // "Kategori / Sub" tanpa memicu N+1 baru.
             ->with([
                 'account:id,workspace_id,name,type',
                 'transferToAccount:id,workspace_id,name,type',
-                'category:id,workspace_id,name,color',
+                'category:id,workspace_id,parent_id,name,color',
+                'category.parent:id,parent_id,name',
                 'tags:id,workspace_id,name',
                 'attachments:id,workspace_id,transaction_id,original_name,mime_type,size',
             ])
@@ -144,12 +148,15 @@ class TransactionController extends Controller
 
         return Inertia::render('transactions/Edit', [
             // `present()` membaca lima relasi; dimuat eksplisit supaya form edit
-            // tidak memicu lima query tambahan.
+            // tidak memicu lima query tambahan. `category.parent` menambah
+            // satu query supaya select kategori utama/sub terisi benar saat
+            // transaksi yang disimpan memakai sub-kategori.
             'transaction' => $this->present(
                 $transaction->load([
                     'account',
                     'transferToAccount',
                     'category',
+                    'category.parent',
                     'tags',
                     'attachments',
                 ]),
@@ -340,19 +347,56 @@ class TransactionController extends Controller
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * Kategori untuk select form transaksi.
+     *
+     * Semua kategori ikut, kategori utama lebih dulu lalu sub-kategorinya
+     * tepat setelah induknya supaya urutannya terbaca sebagai pohon di
+     * dropdown. Level ditandai lewat `parent_id` supaya form bisa memisahkan
+     * select kategori utama dan sub-kategori tanpa query tambahan. Bentuk
+     * payload-nya sama dengan `BudgetController::formOptions()`.
+     *
+     * @return array<int, array{id: int, name: string, color: string, parent_id: int|null}>
      */
     private function categoryOptions(): array
     {
-        return Category::query()
-            ->whereNull('parent_id')
+        $categories = Category::query()
             ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn (Category $category): array => [
-                'id' => $category->id,
-                'name' => $category->name,
-            ])
+            ->get(['id', 'name', 'parent_id', 'color']);
+
+        $childrenByParent = [];
+
+        foreach ($categories as $category) {
+            if ($category->parent_id !== null) {
+                $childrenByParent[(int) $category->parent_id][] = $category;
+            }
+        }
+
+        return $categories
+            ->filter(fn (Category $category): bool => $category->isRoot())
+            ->flatMap(function (Category $root) use ($childrenByParent): array {
+                $options = [$this->categoryOption($root)];
+
+                foreach ($childrenByParent[(int) $root->id] ?? [] as $child) {
+                    $options[] = $this->categoryOption($child);
+                }
+
+                return $options;
+            })
+            ->values()
             ->all();
+    }
+
+    /**
+     * @return array{id: int, name: string, color: string, parent_id: int|null}
+     */
+    private function categoryOption(Category $category): array
+    {
+        return [
+            'id' => (int) $category->id,
+            'name' => $category->name,
+            'color' => $category->color,
+            'parent_id' => $category->parent_id === null ? null : (int) $category->parent_id,
+        ];
     }
 
     /**
@@ -411,7 +455,7 @@ class TransactionController extends Controller
             'occurred_at_iso' => $transaction->occurred_at->toIso8601String(),
             'account' => $transaction->account?->only(['id', 'name', 'type']),
             'transfer_to_account' => $transaction->transferToAccount?->only(['id', 'name', 'type']),
-            'category' => $transaction->category?->only(['id', 'name', 'color']),
+            'category' => $this->presentCategory($transaction),
             'tags' => $transaction->tags
                 ->map(fn (Tag $tag): array => [
                     'id' => $tag->id,
@@ -431,6 +475,30 @@ class TransactionController extends Controller
                 ->values()
                 ->all(),
             'is_recurring_instance' => $transaction->recurring_rule_id !== null,
+        ];
+    }
+
+    /**
+     * Kategori milik transaksi, lengkap dengan nama induknya supaya tabel
+     * bisa menulis "Kategori / Sub" dan form edit bisa mengisi dua select
+     * (kategori utama lalu sub-kategori) tanpa menebak induk dari nama.
+     *
+     * @return array{id: int, name: string, color: string, parent_id: int|null, parent_name: string|null}|null
+     */
+    private function presentCategory(Transaction $transaction): ?array
+    {
+        $category = $transaction->category;
+
+        if ($category === null) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $category->id,
+            'name' => $category->name,
+            'color' => $category->color,
+            'parent_id' => $category->parent_id === null ? null : (int) $category->parent_id,
+            'parent_name' => $category->parent?->name,
         ];
     }
 

@@ -17,8 +17,26 @@ export type TransactionAccountOption = TransactionOption & {
 
 export type TransactionTag = TransactionOption;
 
+/**
+ * Kategori milik sebuah transaksi. `parent_id`/`parent_name` terisi hanya
+ * kalau transaksi memakai sub-kategori, supaya tabel bisa menulis
+ * "Kategori / Sub" dan form edit bisa mengisi dua select terpisah.
+ */
 export type TransactionCategory = TransactionOption & {
     color: string;
+    parent_id: number | null;
+    parent_name: string | null;
+};
+
+/**
+ * Opsi kategori untuk select form dan filter: daftar datar dengan kategori
+ * utama lebih dulu lalu sub-kategorinya, ditandai lewat `parent_id`.
+ */
+export type TransactionCategoryOption = {
+    id: number;
+    name: string;
+    color: string;
+    parent_id: number | null;
 };
 
 export type TransactionAttachment = {
@@ -93,7 +111,7 @@ export type TransactionPagination = {
 
 export type TransactionOptions = {
     accounts: TransactionAccountOption[];
-    categories: TransactionCategory[];
+    categories: TransactionCategoryOption[];
     tags: TransactionTag[];
 };
 
@@ -136,7 +154,7 @@ export type RecurringRuleListItem = {
     last_generated_at: string | null;
     account: TransactionOption | null;
     transfer_to_account: TransactionOption | null;
-    category: TransactionCategory | null;
+    category: TransactionOption | null;
     tag_ids: number[];
     tags: TransactionTag[];
 };
@@ -149,14 +167,14 @@ export type PendingTransaction = {
     note: string | null;
     occurred_at: string;
     account: TransactionOption | null;
-    category: TransactionCategory | null;
+    category: TransactionOption | null;
     tags: string[];
     recurring_rule_id: number | null;
 };
 
 export type RecurringRuleOptions = {
     accounts: TransactionOption[];
-    categories: TransactionCategory[];
+    categories: TransactionOption[];
     tags: TransactionTag[];
     frequencies: { value: RecurringFrequency; label: string }[];
 };

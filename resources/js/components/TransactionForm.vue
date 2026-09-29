@@ -82,11 +82,56 @@ const localAttachments = ref<TransactionListItem['attachments']>([]);
 
 const isTransfer = computed(() => form.type === 'transfer');
 
+/**
+ * Kategori utama dan sub-kategori dipisah supaya form bisa menampilkan dua
+ * select bertingkat. Yang tersimpan ke `form.category_id` tetap kategori yang
+ * benar-benar dipilih: sub-kategori kalau ada, kalau tidak kategori utamanya.
+ */
+const rootCategories = computed(() =>
+    props.options.categories.filter((category) => category.parent_id === null),
+);
+
+const selectedRootId = ref<number | ''>('');
+const selectedChildId = ref<number | ''>('');
+
+const childCategories = computed(() => {
+    if (selectedRootId.value === '') {
+        return [];
+    }
+
+    return props.options.categories.filter(
+        (category) => category.parent_id === selectedRootId.value,
+    );
+});
+
+watch(selectedRootId, (rootId) => {
+    // Sub-kategori yang tidak lagi milik kategori utama terpilih harus
+    // dibuang; kalau tidak, form bisa mengirim pasangan induk/sub yang tidak
+    // saling related. Sub-kategori yang masih cocok tetap dibiarkan supaya
+    // `hydrate()` boleh mengisi kedua select sekaligus tanpa saling menimpa.
+    const childStillBelongs = props.options.categories.some(
+        (category) =>
+            category.id === selectedChildId.value &&
+            category.parent_id === rootId,
+    );
+
+    if (!childStillBelongs) {
+        selectedChildId.value = '';
+    }
+});
+
+watch([selectedRootId, selectedChildId], ([rootId, childId]) => {
+    form.category_id = childId === '' ? rootId : childId;
+});
+
 function hydrate(transaction: TransactionListItem): void {
+    const category = transaction.category;
+    const usesChild = category !== null && category.parent_id !== null;
+
     form.defaults({
         account_id: transaction.account?.id ?? '',
         transfer_to_account_id: transaction.transfer_to_account?.id ?? '',
-        category_id: transaction.category?.id ?? '',
+        category_id: category?.id ?? '',
         type: transaction.type,
         amount: transaction.amount,
         occurred_at: transaction.occurred_at,
@@ -99,6 +144,10 @@ function hydrate(transaction: TransactionListItem): void {
     form.clearErrors();
     selectedFile.value = null;
     localAttachments.value = [...transaction.attachments];
+    selectedRootId.value = usesChild
+        ? (category.parent_id ?? '')
+        : (category?.id ?? '');
+    selectedChildId.value = usesChild ? (category?.id ?? '') : '';
 }
 
 if (props.transaction) {
@@ -112,6 +161,8 @@ if (props.transaction) {
  */
 watch(isTransfer, (transfer) => {
     if (transfer) {
+        selectedRootId.value = '';
+        selectedChildId.value = '';
         form.category_id = '';
     } else {
         form.transfer_to_account_id = '';
@@ -251,27 +302,64 @@ function submit(): void {
                         />
                     </div>
 
-                    <div v-else class="grid gap-2">
-                        <Label for="transaction-category">Kategori</Label>
-                        <Select v-model="form.category_id">
-                            <SelectTrigger
-                                id="transaction-category"
-                                class="w-full shadow-neu-inset"
-                                :aria-invalid="Boolean(form.errors.category_id)"
-                            >
-                                <SelectValue placeholder="Pilih kategori" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem
-                                    v-for="category in options.categories"
-                                    :key="category.id"
-                                    :value="category.id"
+                    <div v-else class="flex flex-col gap-4">
+                        <div class="grid gap-2">
+                            <Label for="transaction-category">
+                                Kategori utama
+                            </Label>
+                            <Select v-model="selectedRootId">
+                                <SelectTrigger
+                                    id="transaction-category"
+                                    class="w-full shadow-neu-inset"
+                                    :aria-invalid="
+                                        Boolean(form.errors.category_id)
+                                    "
                                 >
-                                    {{ category.name }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <InputError :message="form.errors.category_id" />
+                                    <SelectValue placeholder="Pilih kategori" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="category in rootCategories"
+                                        :key="category.id"
+                                        :value="category.id"
+                                    >
+                                        {{ category.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <InputError :message="form.errors.category_id" />
+                        </div>
+
+                        <div
+                            v-if="childCategories.length > 0"
+                            class="grid gap-2"
+                        >
+                            <Label for="transaction-subcategory">
+                                Sub kategori
+                            </Label>
+                            <Select v-model="selectedChildId">
+                                <SelectTrigger
+                                    id="transaction-subcategory"
+                                    class="w-full shadow-neu-inset"
+                                >
+                                    <SelectValue
+                                        placeholder="Pilih sub kategori (opsional)"
+                                    />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="category in childCategories"
+                                        :key="category.id"
+                                        :value="category.id"
+                                    >
+                                        {{ category.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p class="text-xs text-muted-foreground">
+                                Kosongkan untuk memakai kategori utama langsung.
+                            </p>
+                        </div>
                     </div>
 
                     <div class="grid gap-2">
