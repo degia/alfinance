@@ -49,15 +49,30 @@ class TransactionRequest extends FormRequest
             'note' => ['nullable', 'string', 'max:255'],
 
             // Kategori hanya relevan untuk income/expense.
+            //
+            // `nullable` selalu ikut, termasuk di cabang `prohibited`: form Vue
+            // mengirim `category_id: ''` dan middleware `ConvertEmptyStringsToNull`
+            // mengubahnya jadi `null` sebelum validasi. Tanpa `nullable`, Laravel
+            // tetap menjalankan aturan `exists` terhadap `null` sehingga expense
+            // biasa ditolak dengan pesan "Kategori tidak ditemukan di workspace ini."
+            // `prohibited` sendiri tetap berlaku karena ia menolak nilai yang
+            // benar-benar terisi.
             'category_id' => [
-                $isTransfer ? 'prohibited' : 'nullable',
+                'nullable',
+                ...($isTransfer ? ['prohibited'] : []),
                 Rule::exists('categories', 'id')->where('workspace_id', $workspaceId),
             ],
 
             // Akun tujuan hanya relevan untuk transfer, dan harus berbeda
             // dari akun sumber supaya transfer ke diri sendiri tertangkap.
+            //
+            // `nullable` selalu ikut dengan alasan yang sama seperti
+            // `category_id` di atas: field kosong dari form menjadi `null`, dan
+            // tanpa `nullable` aturan `exists` akan salah lensanya. Saat transfer,
+            // `required` tetap menagih nilainya.
             'transfer_to_account_id' => [
-                $isTransfer ? 'required' : 'prohibited',
+                'nullable',
+                ...($isTransfer ? ['required'] : ['prohibited']),
                 'different:account_id',
                 Rule::exists('accounts', 'id')->where('workspace_id', $workspaceId),
             ],

@@ -41,12 +41,19 @@ class RecurringRuleRequest extends FormRequest
             'amount' => ['required', 'decimal:0,2', 'min:0.01'],
             'note' => ['nullable', 'string', 'max:255'],
 
+            // `nullable` selalu ikut pada kedua field, termasuk di cabang `prohibited`:
+            // form mengirim string kosong yang diubah jadi `null` oleh
+            // `ConvertEmptyStringsToNull`, dan tanpa `nullable` aturan `exists`
+            // akan ikut dijalankan terhadap `null`. Lihat TransactionRequest
+            // untuk penjelasan lengkap.
             'category_id' => [
-                $isTransfer ? 'prohibited' : 'nullable',
+                'nullable',
+                ...($isTransfer ? ['prohibited'] : []),
                 Rule::exists('categories', 'id')->where('workspace_id', $workspaceId),
             ],
             'transfer_to_account_id' => [
-                $isTransfer ? 'required' : 'prohibited',
+                'nullable',
+                ...($isTransfer ? ['required'] : ['prohibited']),
                 'different:account_id',
                 Rule::exists('accounts', 'id')->where('workspace_id', $workspaceId),
             ],

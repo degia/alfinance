@@ -553,6 +553,97 @@ class TransactionsTest extends TestCase
         $this->assertSame('100000.00', $foreignAccount->fresh()->cached_balance);
     }
 
+    /**
+     * Form Vue mengirim string kosong untuk field yang tidak dipakai
+     * (`emptyForm()` di TransactionForm.vue), dan `ConvertEmptyStringsToNull`
+     * mengubahnya jadi `null` sebelum validasi. Aturan `exists` hanya boleh
+     * dilewati kalau field ditandai `nullable`; tanpa itu expense biasa gagal
+     * dengan pesan "Akun tujuan tidak ditemukan di workspace ini."
+     */
+    public function test_expense_accepts_empty_optional_fields_from_the_form(): void
+    {
+        $user = $this->signedIn();
+        $account = Account::factory()->forWorkspace($user->workspaces()->sole())->cash('Dompet', '100000.00')->create();
+
+        $this->post(route('transactions.store'), [
+            'account_id' => $account->id,
+            'type' => TransactionType::Expense->value,
+            'amount' => '25000.00',
+            'occurred_at' => '2026-09-27',
+            'category_id' => '',
+            'transfer_to_account_id' => '',
+        ])->assertRedirect(route('transactions.index'))->assertSessionHasNoErrors();
+
+        $transaction = Transaction::allWorkspaces()->sole();
+
+        $this->assertNull($transaction->category_id);
+        $this->assertNull($transaction->transfer_to_account_id);
+        $this->assertSame('75000.00', $account->fresh()->cached_balance);
+    }
+
+    public function test_transfer_accepts_an_empty_category_from_the_form(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+
+        $source = Account::factory()->forWorkspace($workspace)->cash('Dompet', '500000.00')->create();
+        $target = Account::factory()->forWorkspace($workspace)->bank('BCA', '0.00')->create();
+
+        $this->post(route('transactions.store'), [
+            'account_id' => $source->id,
+            'transfer_to_account_id' => $target->id,
+            'type' => TransactionType::Transfer->value,
+            'amount' => '150000.00',
+            'occurred_at' => '2026-09-27',
+            'category_id' => '',
+        ])->assertRedirect(route('transactions.index'))->assertSessionHasNoErrors();
+
+        $this->assertSame('350000.00', $source->fresh()->cached_balance);
+        $this->assertSame('150000.00', $target->fresh()->cached_balance);
+    }
+
+    /**`prohibited` tetap menagih nilai yang benar-benar terisi. */
+    public function test_expense_still_rejects_a_filled_destination_account(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+
+        $source = Account::factory()->forWorkspace($workspace)->cash('Dompet', '100000.00')->create();
+        $other = Account::factory()->forWorkspace($workspace)->bank('BCA', '0.00')->create();
+
+        $this->post(route('transactions.store'), [
+            'account_id' => $source->id,
+            'transfer_to_account_id' => $other->id,
+            'type' => TransactionType::Expense->value,
+            'amount' => '25000.00',
+            'occurred_at' => '2026-09-27',
+            'category_id' => '',
+        ])->assertSessionHasErrors('transfer_to_account_id');
+
+        $this->assertSame('100000.00', $source->fresh()->cached_balance);
+    }
+
+    public function test_transfer_still_rejects_a_filled_category(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+
+        $source = Account::factory()->forWorkspace($workspace)->cash('Dompet', '100000.00')->create();
+        $target = Account::factory()->forWorkspace($workspace)->bank('BCA', '0.00')->create();
+        $category = Category::factory()->forWorkspace($workspace)->create();
+
+        $this->post(route('transactions.store'), [
+            'account_id' => $source->id,
+            'transfer_to_account_id' => $target->id,
+            'type' => TransactionType::Transfer->value,
+            'amount' => '25000.00',
+            'occurred_at' => '2026-09-27',
+            'category_id' => $category->id,
+        ])->assertSessionHasErrors('category_id');
+
+        $this->assertSame('100000.00', $source->fresh()->cached_balance);
+    }
+
     public function test_transactions_require_an_active_workspace(): void
     {
         $user = User::factory()->create();
