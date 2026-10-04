@@ -14,9 +14,21 @@ use App\Http\Controllers\Settings\SidebarPreferenceController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\WorkspaceController;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::inertia('/', 'Welcome')->name('home');
+/*
+|--------------------------------------------------------------------------
+| Root
+|--------------------------------------------------------------------------
+| Tidak ada landing page lagi: tamu langsung diarahkan ke form login,
+| sedangkan user yang sudah masuk diarahkan ke dashboard.
+*/
+Route::get('/', function () {
+    return Auth::check()
+        ? redirect()->route('dashboard')
+        : redirect()->route('login');
+})->name('home');
 
 /*
 |--------------------------------------------------------------------------
