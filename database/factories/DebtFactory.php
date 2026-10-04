@@ -89,6 +89,14 @@ class DebtFactory extends Factory
         return $this->state(fn (): array => ['term_count' => $count]);
     }
 
+    /**
+     * Angsuran per bulan yang tidak ikut diturunkan dari pokok ÷ tenor.
+     */
+    public function installment(string $amount): static
+    {
+        return $this->state(fn (): array => ['installment_amount' => $amount]);
+    }
+
     public function excludedFromNetWorth(): static
     {
         return $this->state(fn (): array => ['include_in_net_worth' => false]);

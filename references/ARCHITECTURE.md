@@ -88,8 +88,8 @@ Transaksi baru disimpan
 - `budget_progress_cache(workspace_id, category_id, month, used_amount, updated_at)`
 - `net_worth_items(id, workspace_id, type[asset|liability], subtype, name, value, valued_at)`
 - `net_worth_snapshots(workspace_id, month, total_assets, total_liabilities, net_worth)`
-- `debts(id, workspace_id, direction[payable|receivable], counterparty, principal, remaining, due_date, status)`
-- `debt_payments(id, debt_id, amount, paid_at)`
+- `debts(id, workspace_id, direction[payable|receivable], counterparty, principal, remaining, interest_rate, start_date, due_date, term_count, installment_amount, status[ongoing|settled|overdue], include_in_net_worth, account_id, note)`
+- `debt_payments(workspace_id, debt_id, transaction_id, amount, paid_at, note)`
 - `dashboard_snapshots(workspace_id, month, total_income, total_expense, net_cash_flow)`
 - `financial_health_scores(workspace_id, month, savings_rate, dti, emergency_fund_months, score, label)`
 - `export_jobs(id, workspace_id, type, status, file_path)`

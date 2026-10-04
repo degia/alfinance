@@ -36,6 +36,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $start_date
  * @property CarbonImmutable|null $due_date
  * @property int|null $term_count
+ * @property string|null $installment_amount
  * @property DebtStatus $status
  * @property bool $include_in_net_worth
  * @property string|null $note
@@ -54,6 +55,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'start_date',
     'due_date',
     'term_count',
+    'installment_amount',
     'status',
     'include_in_net_worth',
     'note',
@@ -77,6 +79,7 @@ class Debt extends WorkspaceScopedModel
             'start_date' => 'date',
             'due_date' => 'date',
             'term_count' => 'integer',
+            'installment_amount' => 'decimal:2',
             'include_in_net_worth' => 'boolean',
         ];
     }
@@ -195,11 +198,23 @@ class Debt extends WorkspaceScopedModel
     }
 
     /**
-     * Nominal per cicilan bila jadwalnya ditentukan (`term_count`).
-     * Pembulatan sisa pokok ditambahkan ke cicilan terakhir.
+     * Nominal cicilan per bulan.
+     *
+     * Angkanya selalu yang mengisi form lebih dulu: kalau `installment_amount`
+     * diisi, nominal itu yang dipakai — termasuk kalau `term_count` kosong,
+     * karena cicilan bulanan tetap bisa disepakati tanpa batas cicilan tetap.
+     * Kalau kosong, diturunkan dari `principal / term_count` supaya utang lama
+     * yang belum punya angsuran eksplisit tetap punya angka, dan sisa
+     * pembulatan diabaikan karena hanya perkiraan.
+     *
+     * Tanpa keduanya, jadwal bulanannya belum ditentukan -> null.
      */
     public function installmentAmount(): ?string
     {
+        if ($this->installment_amount !== null) {
+            return Money::atLeastZero($this->installment_amount);
+        }
+
         if ($this->term_count === null || $this->term_count < 1) {
             return null;
         }

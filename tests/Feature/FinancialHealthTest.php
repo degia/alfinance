@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\DashboardSnapshot;
+use App\Models\Debt;
 use App\Models\User;
 use App\Services\FinancialHealth\FinancialHealthService;
 use Carbon\CarbonImmutable;
@@ -40,6 +41,36 @@ class FinancialHealthTest extends TestCase
         // 3 juta / rata-rata expense 1 juta = 3 bulan. Kalau akun tabungan ikut
         // dihitung, hasilnya 12 bulan.
         $this->assertSame('3.00', $score->emergency_fund_months);
+    }
+
+    public function test_monthly_installments_follow_the_installment_amount(): void
+    {
+        $user = User::factory()->withWorkspace()->create();
+        $workspace = $user->workspaces()->sole();
+        $month = CarbonImmutable::now()->startOfMonth();
+
+        Account::factory()->forWorkspace($workspace)->cash('Dompet Tunai', '2000000.00')->create();
+
+        DashboardSnapshot::factory()
+            ->forWorkspace($workspace)
+            ->forMonth($month->format('Y-m'))
+            ->totals('6000000.00', '1000000.00')
+            ->create();
+
+        // Pokok 12 juta, tenor 12 bulan, tapi angsuran yang disepakati 500
+        // ribu. Rasio harus memakai 500 ribu (8,33%), bukan hasil bagi yang
+        // 1 juta (16,67%).
+        Debt::factory()
+            ->forWorkspace($workspace)
+            ->payable()
+            ->principal('12000000.00')
+            ->terms(12)
+            ->installment('500000.00')
+            ->create();
+
+        $score = app(FinancialHealthService::class)->recompute($workspace->id, $month);
+
+        $this->assertSame('8.33', $score->dti);
     }
 
     public function test_credit_card_debt_is_not_counted_as_emergency_fund(): void

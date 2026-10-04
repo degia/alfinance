@@ -40,6 +40,7 @@ class DebtRequest extends FormRequest
             'start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'term_count' => ['nullable', 'integer', 'min:1', 'max:600'],
+            'installment_amount' => ['nullable', 'decimal:0,2', 'min:0.01', 'max:9999999999999.99'],
             'include_in_net_worth' => ['nullable', 'boolean'],
             'note' => ['nullable', 'string', 'max:500'],
             'account_id' => [
@@ -70,6 +71,7 @@ class DebtRequest extends FormRequest
             'due_date.after_or_equal' => __('Jatuh tempo tidak boleh sebelum tanggal mulai.'),
             'term_count.min' => __('Jumlah cicilan minimal 1.'),
             'term_count.max' => __('Jumlah cicilan terlalu banyak.'),
+            'installment_amount.min' => __('Angsuran per bulan harus lebih besar dari nol.'),
             'account_id.exists' => __('Akun tidak ditemukan di workspace ini.'),
         ];
     }
@@ -87,6 +89,7 @@ class DebtRequest extends FormRequest
             'start_date' => __('tanggal mulai'),
             'due_date' => __('jatuh tempo'),
             'term_count' => __('jumlah cicilan'),
+            'installment_amount' => __('angsuran per bulan'),
             'account_id' => __('akun pembayaran'),
             'include_in_net_worth' => __('masukkan ke net worth'),
         ];
@@ -107,6 +110,7 @@ class DebtRequest extends FormRequest
             'start_date' => $this->filled('start_date') ? (string) $this->validated('start_date') : null,
             'due_date' => $this->filled('due_date') ? (string) $this->validated('due_date') : null,
             'term_count' => $this->filled('term_count') ? (int) $this->validated('term_count') : null,
+            'installment_amount' => $this->filled('installment_amount') ? (string) $this->validated('installment_amount') : null,
             // Piutang selalu dihitung sebagai aset — opt-in hanya bermakna
             // untuk utang yang menaikkan kewajiban.
             'include_in_net_worth' => $direction->isPayable()

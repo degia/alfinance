@@ -188,16 +188,27 @@ const hasPayments = computed(() => props.payments.length > 0);
                     <p
                         class="text-xs tracking-wide text-muted-foreground uppercase"
                     >
-                        Cicilan
+                        Angsuran per bulan
                     </p>
                     <p class="mt-1 text-xl font-semibold">
-                        {{ props.debt.paid_term_count }}
-                        <span
-                            v-if="props.debt.term_count"
-                            class="text-sm font-normal text-muted-foreground"
-                        >
-                            / {{ props.debt.term_count }}
-                        </span>
+                        {{
+                            props.debt.installment_amount === null
+                                ? 'Tidak ada'
+                                : formatCurrency(props.debt.installment_amount)
+                        }}
+                    </p>
+                    <p
+                        v-if="props.debt.installment_amount !== null"
+                        class="mt-1 text-xs text-muted-foreground"
+                    >
+                        <template v-if="props.debt.term_count">
+                            Tenor {{ props.debt.term_count }} bln ·
+                            {{ props.debt.paid_term_count }} terbayar
+                        </template>
+                        <template v-else>
+                            Tenor bebas · {{ props.debt.paid_term_count }}
+                            pembayaran
+                        </template>
                     </p>
                 </CardContent>
             </Card>

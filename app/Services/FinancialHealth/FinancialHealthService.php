@@ -228,9 +228,11 @@ class FinancialHealthService
      * Total cicilan bulanan dari utang yang masih berjalan, dalam sen.
      *
      * Hanya utang (`payable`) yang dihitung — piutang bukan beban. Cicilan
-     * diturunkan dari jadwal (`principal / term_count`) lalu dibatasi sisa
-     * pokok, supaya utang yang hampir lunas tidak ikut menghitung cicilan
-     * penuh. Utang tanpa `term_count` tidak punya jadwal yang bisa diturunkan,
+     * diambil dari angsuran per bulan yang diisi di form; kalau kosong
+     * {@see Debt::installmentAmount()} menurunkannya dari jadwal
+     * (`principal / term_count`). Nilainya lalu dibatasi sisa pokok, supaya
+     * utang yang hampir lunas tidak ikut menghitung cicilan penuh. Utang tanpa
+     * jadwal maupun angsuran per bulan tidak punya angka yang bisa diturunkan,
      * jadi sisa pokoknya yang dipakai sebagai beban bulan ini.
      */
     private function monthlyInstallments(int $workspaceId): int
@@ -239,7 +241,7 @@ class FinancialHealthService
             ->where('workspace_id', $workspaceId)
             ->payable()
             ->where('remaining', '>', 0)
-            ->get(['principal', 'remaining', 'term_count']);
+            ->get(['principal', 'remaining', 'term_count', 'installment_amount']);
 
         $installments = 0;
 

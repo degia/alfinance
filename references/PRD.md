@@ -64,6 +64,7 @@ Alfinance.com adalah aplikasi web manajemen keuangan personal bergaya SaaS multi
 
 - Utang (saya berutang) & Piutang (orang berutang ke saya).
 - Jadwal cicilan, riwayat pembayaran per cicilan, status: Berjalan / Lunas / Terlambat.
+- Tenor (jumlah cicilan) dan angsuran per bulan: angsuran bisa diisi sendiri karena yang disepakati tidak selalu sama dengan pokok ÷ tenor. Kosongnya angsuran berarti diturunkan dari tenor, dan angsuran boleh ada tanpa tenor tetap.
 - Terhubung opsional ke modul Net Worth (sebagai kewajiban) dan Transactions (pembayaran cicilan = expense/income).
 
 ### 3.8 Reports

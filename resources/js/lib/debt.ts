@@ -13,6 +13,7 @@ export function emptyDebtForm(): DebtFormData {
         start_date: '',
         due_date: '',
         term_count: '',
+        installment_amount: '',
         include_in_net_worth: true,
         note: '',
         account_id: '',

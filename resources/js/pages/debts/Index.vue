@@ -207,11 +207,15 @@ function dueHint(dueDate: string | null, daysUntilDue: number | null): string {
 
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-xs text-muted-foreground">
-                        <span v-if="debt.term_count && debt.installment_amount">
-                            Cicilan
-                            {{ formatCurrency(debt.installment_amount) }} ×
-                            {{ debt.term_count }} ({{ debt.paid_term_count }}
-                            terbayar)
+                        <span v-if="debt.installment_amount">
+                            Angsuran
+                            {{ formatCurrency(debt.installment_amount) }}/bln
+                            <template v-if="debt.term_count">
+                                · tenor {{ debt.term_count }} bln ({{
+                                    debt.paid_term_count
+                                }}
+                                terbayar)
+                            </template>
                         </span>
                         <span v-else-if="debt.interest_rate">
                             Bunga {{ debt.interest_rate }}%/thn

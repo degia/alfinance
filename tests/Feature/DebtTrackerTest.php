@@ -87,6 +87,109 @@ class DebtTrackerTest extends TestCase
         $this->assertTrue($debt->include_in_net_worth);
     }
 
+    public function test_members_can_set_the_monthly_installment(): void
+    {
+        $this->signedIn();
+
+        $this->post(route('debts.store'), [
+            'direction' => DebtDirection::Payable->value,
+            'counterparty' => 'Koperasi Simpan Pinjam',
+            'principal' => '12000000.00',
+            'term_count' => 12,
+            // Angsuran disepakati bulat 1.150.000, bukan hasil bagi 12.000.000 / 12.
+            'installment_amount' => '1150000.00',
+        ])->assertRedirect(route('debts.index'));
+
+        $debt = Debt::allWorkspaces()->sole();
+
+        $this->assertSame('1150000.00', $debt->installment_amount);
+        $this->assertSame('1150000.00', $debt->installmentAmount());
+
+        $this->get(route('debts.index'))->assertInertia(
+            fn ($page) => $page->component('debts/Index')
+                ->where('debts.0.installment_amount', '1150000.00')
+                ->where('debts.0.term_count', 12)
+        );
+
+        $this->get(route('debts.show', $debt))->assertInertia(
+            fn ($page) => $page->component('debts/Show')
+                ->where('debt.installment_amount', '1150000.00')
+        );
+    }
+
+    public function test_the_monthly_installment_works_without_a_fixed_tenor(): void
+    {
+        $this->signedIn();
+
+        $this->post(route('debts.store'), [
+            'direction' => DebtDirection::Payable->value,
+            'counterparty' => 'Kartu Kredit Bank',
+            'principal' => '5000000.00',
+            'installment_amount' => '750000.00',
+        ])->assertRedirect(route('debts.index'));
+
+        $debt = Debt::allWorkspaces()->sole();
+
+        // Tenor kosong tidak menghalangi cicilan bulanan yang tetap disepakati.
+        $this->assertNull($debt->term_count);
+        $this->assertSame('750000.00', $debt->installmentAmount());
+    }
+
+    public function test_the_monthly_installment_is_optional_and_falls_back_to_the_tenor(): void
+    {
+        $this->signedIn();
+
+        $this->post(route('debts.store'), [
+            'direction' => DebtDirection::Receivable->value,
+            'counterparty' => 'Kak Rina',
+            'principal' => '750000.00',
+            'term_count' => 3,
+            'installment_amount' => '',
+        ])->assertRedirect(route('debts.index'));
+
+        $debt = Debt::allWorkspaces()->sole();
+
+        $this->assertNull($debt->installment_amount);
+        // Kosong berarti turunkan dari pokok ÷ jumlah cicilan.
+        $this->assertSame('250000.00', $debt->installmentAmount());
+
+        // Mengosongkan lagi mengembalikan angka ke turunan, bukan 0.
+        $this->put(route('debts.update', $debt), [
+            'direction' => DebtDirection::Receivable->value,
+            'counterparty' => 'Kak Rina',
+            'principal' => '750000.00',
+            'term_count' => 3,
+            'installment_amount' => '300000.00',
+        ])->assertRedirect(route('debts.show', $debt));
+
+        $this->assertSame('300000.00', $debt->refresh()->installment_amount);
+
+        $this->put(route('debts.update', $debt), [
+            'direction' => DebtDirection::Receivable->value,
+            'counterparty' => 'Kak Rina',
+            'principal' => '750000.00',
+            'term_count' => 3,
+            'installment_amount' => '',
+        ])->assertRedirect(route('debts.show', $debt));
+
+        $this->assertNull($debt->refresh()->installment_amount);
+        $this->assertSame('250000.00', $debt->installmentAmount());
+    }
+
+    public function test_the_monthly_installment_is_validated(): void
+    {
+        $this->signedIn();
+
+        $this->post(route('debts.store'), [
+            'direction' => DebtDirection::Payable->value,
+            'counterparty' => 'Tempo',
+            'principal' => '1000000.00',
+            'installment_amount' => '0.00',
+        ])->assertSessionHasErrors('installment_amount');
+
+        $this->assertSame(0, Debt::allWorkspaces()->count());
+    }
+
     public function test_a_receivable_is_always_part_of_net_worth(): void
     {
         $this->signedIn();

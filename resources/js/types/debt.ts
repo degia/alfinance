@@ -76,6 +76,8 @@ export type DebtFormData = {
     start_date: string;
     due_date: string;
     term_count: string;
+    /** Angsuran per bulan; kosong = turunkan dari pokok ÷ jumlah cicilan. */
+    installment_amount: string;
     include_in_net_worth: boolean;
     note: string;
     account_id: string;

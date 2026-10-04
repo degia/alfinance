@@ -306,6 +306,15 @@ class DebtService
             $normalized['principal'] = Money::fromCents(Money::toCents($normalized['principal']));
         }
 
+        // Angsuran per bulan opsional: form mengirim string kosong bila
+        // dikosongkan, dan itu berarti "biarkan diturunkan dari pokok ÷ jumlah
+        // cicilan" (NULL), bukan 0.
+        if (array_key_exists('installment_amount', $normalized) && ! empty($normalized['installment_amount'])) {
+            $normalized['installment_amount'] = Money::fromCents(Money::toCents($normalized['installment_amount']));
+        } elseif (array_key_exists('installment_amount', $normalized)) {
+            $normalized['installment_amount'] = null;
+        }
+
         // Suku bunga opsional: form mengirim string kosong bila dikosongkan, dan
         // itu berarti "tanpa bunga" (NULL), bukan 0.
         if (array_key_exists('interest_rate', $normalized) && ! empty($normalized['interest_rate'])) {

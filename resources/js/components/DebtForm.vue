@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import type { InertiaForm } from '@inertiajs/vue3';
 import { Save } from '@lucide/vue';
@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { emptyDebtForm } from '@/lib/debt';
+import { formatCurrency } from '@/lib/format';
 import type { Debt, DebtFormData, DebtFormOptions } from '@/types';
 
 const props = defineProps<{
@@ -44,6 +45,7 @@ const initial = (): DebtFormData =>
                   props.debt.term_count === null
                       ? ''
                       : String(props.debt.term_count),
+              installment_amount: props.debt.installment_amount ?? '',
               include_in_net_worth: props.debt.include_in_net_worth,
               note: props.debt.note ?? '',
               account_id:
@@ -59,6 +61,34 @@ const form = useForm<DebtFormData>(initial());
  * bermakna untuk utang. Ini aturan yang sama dengan `DebtRequest`.
  */
 const isPayable = computed(() => form.direction !== 'receivable');
+
+/**
+ * Saran angsuran = pokok ÷ jumlah cicilan, sama dengan aturan
+ * `Debt::installmentAmount()` di backend. Sisa pembulatan diabaikan karena angka
+ * ini cuma saran; user tetap boleh mengetik nominal sendiri.
+ */
+const suggestedInstallment = computed(() => {
+    const principal = Number.parseFloat(form.principal);
+    const terms = Number.parseInt(form.term_count, 10);
+
+    if (!Number.isFinite(principal) || principal <= 0) {
+        return '';
+    }
+
+    if (!Number.isFinite(terms) || terms < 1) {
+        return '';
+    }
+
+    return (principal / terms).toFixed(2);
+});
+
+// Auto-fill hanya saat kolom masih kosong, jadi nominal yang diketik manual
+// tidak ikut tertimpa saat pokok atau tenor berubah.
+watch(suggestedInstallment, (suggestion) => {
+    if (suggestion !== '' && form.installment_amount === '') {
+        form.installment_amount = suggestion;
+    }
+});
 
 function submit(): void {
     props.onSubmit(form);
@@ -133,7 +163,7 @@ function submit(): void {
                     </div>
                 </div>
 
-                <div class="grid gap-4 md:grid-cols-3">
+                <div class="grid gap-4 md:grid-cols-2">
                     <div class="grid gap-2">
                         <Label for="debt-start">Tanggal mulai</Label>
                         <Input
@@ -169,6 +199,30 @@ function submit(): void {
                             :aria-invalid="Boolean(form.errors.term_count)"
                         />
                         <InputError :message="form.errors.term_count" />
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label for="debt-installment">Angsuran per bulan</Label>
+                        <Input
+                            id="debt-installment"
+                            v-model="form.installment_amount"
+                            inputmode="decimal"
+                            placeholder="Otomatis dari pokok ÷ tenor"
+                            class="shadow-neu-inset"
+                            :aria-invalid="
+                                Boolean(form.errors.installment_amount)
+                            "
+                        />
+                        <InputError
+                            :message="form.errors.installment_amount"
+                        />
+                        <p
+                            v-if="suggestedInstallment !== ''"
+                            class="text-xs text-muted-foreground"
+                        >
+                            Saran {{ formatCurrency(suggestedInstallment) }}
+                            per bulan
+                        </p>
                     </div>
                 </div>
 
