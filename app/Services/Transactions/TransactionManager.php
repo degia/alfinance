@@ -35,24 +35,37 @@ use RuntimeException;
  */
 class TransactionManager
 {
+    public function __construct(private readonly AdminFeeManager $adminFees) {}
+
     /**
      * @param  array<string, mixed>  $attributes
      * @param  array<int, int>  $tagIds
+     * @param  int|null  $adminFee  potongan admin dalam sen; hanya berlaku untuk transfer
      */
     public function create(
         array $attributes,
         ?int $actorId = null,
         array $tagIds = [],
         ?UploadedFile $attachment = null,
+        ?int $adminFee = null,
     ): Transaction {
-        $transaction = DB::transaction(function () use ($attributes, $actorId, $tagIds, $attachment): Transaction {
+        $transaction = DB::transaction(function () use ($attributes, $actorId, $tagIds, $attachment, $adminFee): Transaction {
             $transaction = new Transaction($attributes);
             $transaction->created_by = $actorId;
             $transaction->updated_by = $actorId;
             $transaction->save();
 
             $this->syncTags($transaction, $tagIds);
-            $this->applyDeltas($transaction->balanceDeltas(), $transaction->workspace_id);
+
+            // Potongan admin dicatat sebagai baris expense terpisah, tapi
+            // dampaknya digabung ke peta delta yang sama supaya akun yang sama
+            // tidak ditulis dua kali.
+            $fee = $this->syncAdminFee($transaction, $adminFee, $actorId);
+
+            $this->applyDeltas(
+                $this->mergeDeltas($transaction->balanceDeltas(), $fee?->balanceDeltas() ?? []),
+                $transaction->workspace_id,
+            );
 
             if ($attachment !== null) {
                 $this->storeAttachment($transaction, $attachment);
@@ -62,6 +75,7 @@ class TransactionManager
         });
 
         TransactionSaved::dispatch($transaction, created: true);
+        $this->dispatchAdminFeeSaved($transaction);
 
         return $transaction;
     }
@@ -76,6 +90,7 @@ class TransactionManager
      *
      * @param  array<string, mixed>  $attributes
      * @param  array<int, int>|null  $tagIds  null = jangan sentuh tag
+     * @param  int|null  $adminFee  potongan admin dalam sen; null = tanpa potongan admin
      */
     public function update(
         Transaction $transaction,
@@ -84,11 +99,16 @@ class TransactionManager
         ?array $tagIds = null,
         ?UploadedFile $attachment = null,
         bool $removeAttachment = false,
+        ?int $adminFee = null,
     ): Transaction {
-        $previousDeltas = $transaction->reversedBalanceDeltas();
+        $previousFee = $this->adminFees->find($transaction);
+        $previousDeltas = $this->mergeDeltas(
+            $transaction->reversedBalanceDeltas(),
+            $this->adminFees->reversedDeltas($previousFee),
+        );
         $previousMonth = $transaction->occurred_at->format('Y-m');
 
-        $updated = DB::transaction(function () use ($transaction, $attributes, $actorId, $tagIds, $attachment, $removeAttachment, $previousDeltas): Transaction {
+        $updated = DB::transaction(function () use ($transaction, $attributes, $actorId, $tagIds, $attachment, $removeAttachment, $adminFee, $previousDeltas): Transaction {
             $transaction->fill($attributes);
             $transaction->updated_by = $actorId;
             $transaction->save();
@@ -97,8 +117,13 @@ class TransactionManager
                 $this->syncTags($transaction, $tagIds);
             }
 
+            $fee = $this->syncAdminFee($transaction, $adminFee, $actorId);
+
             $this->applyDeltas(
-                $this->mergeDeltas($previousDeltas, $transaction->balanceDeltas()),
+                $this->mergeDeltas(
+                    $previousDeltas,
+                    $this->mergeDeltas($transaction->balanceDeltas(), $fee?->balanceDeltas() ?? []),
+                ),
                 $transaction->workspace_id,
             );
 
@@ -116,6 +141,20 @@ class TransactionManager
         // ketika tanggal transaksi dikoreksi ke bulan lain.
         TransactionSaved::dispatch($updated, previousMonth: $previousMonth);
 
+        if ($fee = $this->adminFees->find($updated)) {
+            // Kalau tanggal transfer dikoreksi ke bulan lain, baris biayanya
+            // ikut pindah bulan — agregat bulan lamanya harus di-invalidate
+            // juga, sama seperti transaksi induknya.
+            $previousFeeMonth = $previousFee?->occurred_at->format('Y-m') ?? $previousMonth;
+
+            TransactionSaved::dispatch($fee, previousMonth: $previousFeeMonth);
+        } elseif ($previousFee !== null) {
+            // Baris potongan admin dihapus (dikosongkan di form, atau transfer
+            // diubah jadi income/expense) — listener tetap harus tahu supaya
+            // agregat bulan yang terpengaruh ikut dibersihkan.
+            TransactionDeleted::dispatch($previousFee);
+        }
+
         return $updated;
     }
 
@@ -124,16 +163,25 @@ class TransactionManager
      */
     public function delete(Transaction $transaction): void
     {
-        $deltas = $transaction->reversedBalanceDeltas();
+        $fee = $this->adminFees->find($transaction);
+        $deltas = $this->mergeDeltas(
+            $transaction->reversedBalanceDeltas(),
+            $this->adminFees->reversedDeltas($fee),
+        );
 
-        DB::transaction(function () use ($transaction, $deltas): void {
+        DB::transaction(function () use ($transaction, $fee, $deltas): void {
             $this->applyDeltas($deltas, $transaction->workspace_id);
             $this->deleteAttachments($transaction);
             $transaction->tags()->detach();
+            $fee?->delete();
             $transaction->delete();
         });
 
         TransactionDeleted::dispatch($transaction);
+
+        if ($fee !== null) {
+            TransactionDeleted::dispatch($fee);
+        }
     }
 
     /**
@@ -149,12 +197,26 @@ class TransactionManager
             $transaction->updated_by = $actorId;
             $transaction->save();
 
-            $this->applyDeltas($transaction->balanceDeltas(), $transaction->workspace_id);
+            $fee = $this->adminFees->find($transaction);
+
+            // Baris potongan admin ikut jadi posted supaya efek saldonya ikut
+            // masuk di titik yang sama dengan transfernya.
+            if ($fee !== null) {
+                $fee->status = TransactionStatus::Posted;
+                $fee->updated_by = $actorId;
+                $fee->save();
+            }
+
+            $this->applyDeltas(
+                $this->mergeDeltas($transaction->balanceDeltas(), $fee?->balanceDeltas() ?? []),
+                $transaction->workspace_id,
+            );
 
             return $transaction;
         });
 
         TransactionSaved::dispatch($confirmed);
+        $this->dispatchAdminFeeSaved($confirmed);
 
         return $confirmed;
     }
@@ -167,14 +229,21 @@ class TransactionManager
         abort_unless($transaction->isPending(), 422, 'Hanya instance menunggu konfirmasi yang bisa dibuang.');
 
         // Deltas transaksi pending selalu kosong, jadi tidak ada saldo yang perlu
-        // dibalik; cukup hapus lampiran dan barisnya.
-        DB::transaction(function () use ($transaction): void {
+        // dibalik; cukup hapus lampiran, baris biaya admin, dan barisnya.
+        $fee = $this->adminFees->find($transaction);
+
+        DB::transaction(function () use ($transaction, $fee): void {
             $this->deleteAttachments($transaction);
             $transaction->tags()->detach();
+            $fee?->delete();
             $transaction->delete();
         });
 
         TransactionDeleted::dispatch($transaction);
+
+        if ($fee !== null) {
+            TransactionDeleted::dispatch($fee);
+        }
     }
 
     /**
@@ -201,6 +270,38 @@ class TransactionManager
         ];
 
         return $this->create($attributes, $actorId, $rule->tag_ids ?? []);
+    }
+
+    /**
+     * Sinkronkan baris potongan admin milik sebuah transfer.
+     *
+     * Hanya transfer yang boleh punya potongan admin; untuk tipe lain
+     * `AdminFeeManager` diberi 0 supaya baris yang tadinya ada ikut terhapus
+     * (mis. user mengubah transfer menjadi expense biasa).
+     */
+    private function syncAdminFee(Transaction $transaction, ?int $adminFee, ?int $actorId): ?Transaction
+    {
+        return $this->adminFees->sync(
+            $transaction,
+            $transaction->isTransfer() ? $adminFee : 0,
+            $actorId,
+        );
+    }
+
+    /**
+     * Kirim `TransactionSaved` untuk baris potongan admin, kalau ada.
+     *
+     * Baris biaya ikut meng-invalidate cache lewat event yang sama dengan
+     * transaksi induknya, karena baris itu expense yang ikut dihitung dashboard,
+     * laporan, dan progress anggaran.
+     */
+    private function dispatchAdminFeeSaved(Transaction $transaction): void
+    {
+        $fee = $this->adminFees->find($transaction);
+
+        if ($fee !== null) {
+            TransactionSaved::dispatch($fee);
+        }
     }
 
     /**

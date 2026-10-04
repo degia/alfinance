@@ -82,6 +82,7 @@ class TransactionController extends Controller
                 'category.parent:id,parent_id,name',
                 'tags:id,workspace_id,name',
                 'attachments:id,workspace_id,transaction_id,original_name,mime_type,size',
+                'adminFee:id,workspace_id,parent_transaction_id,amount',
             ])
             ->paginate($request->perPage())
             ->withQueryString();
@@ -132,6 +133,7 @@ class TransactionController extends Controller
             $request->user()?->id,
             $request->tagIds(),
             $request->file('attachment'),
+            $request->adminFeeCents(),
         );
 
         Inertia::flash('toast', [
@@ -159,6 +161,7 @@ class TransactionController extends Controller
                     'category.parent',
                     'tags',
                     'attachments',
+                    'adminFee',
                 ]),
             ),
             'options' => [
@@ -180,6 +183,7 @@ class TransactionController extends Controller
             $request->tagIds(),
             $request->file('attachment'),
             $request->shouldRemoveAttachment(),
+            $request->adminFeeCents(),
         );
 
         Inertia::flash('toast', [
@@ -475,6 +479,11 @@ class TransactionController extends Controller
                 ->values()
                 ->all(),
             'is_recurring_instance' => $transaction->recurring_rule_id !== null,
+            // Nominal potongan admin transfer ini (untuk mengisi form edit) dan
+            // penanda baris yang memang hasil potongan admin (untuk badge di
+            // daftar). Keduanya sudah ter-eager-load, jadi tidak menambah query.
+            'admin_fee' => $transaction->adminFee?->amount,
+            'is_admin_fee' => $transaction->isAdminFee(),
         ];
     }
 

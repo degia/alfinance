@@ -4,6 +4,8 @@ namespace App\Http\Requests;
 
 use App\Enums\TransactionType;
 use App\Models\Workspace;
+use App\Services\Transactions\AdminFeeManager;
+use App\Support\Money;
 use App\Support\Workspace\ActiveWorkspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Http\FormRequest;
@@ -16,6 +18,10 @@ use Illuminate\Validation\Rule;
  * - income/expense tidak boleh punya akun tujuan, kategori opsional
  *   (dipakai sebagai dimensi laporan, bukan kolom wajib);
  * - transfer wajib akun tujuan yang berbeda dari akun sumber dan tidak berkategori.
+ *
+ * `admin_fee` (potongan admin) juga hanya berlaku untuk transfer: nilainya tidak
+ * disimpan di baris transfer, tapi dicatat sebagai baris `expense` terpisah
+ * (lihat {@see AdminFeeManager}).
  */
 class TransactionRequest extends FormRequest
 {
@@ -83,6 +89,18 @@ class TransactionRequest extends FormRequest
                 Rule::exists('tags', 'id')->where('workspace_id', $workspaceId),
             ],
 
+            // Potongan admin hanya untuk transfer, dan opsional — form selalu
+            // mengirim field ini, jadi `nullable` wajib agar string kosong dari
+            // form (yang jadi `null` setelah `ConvertEmptyStringsToNull`) lolos
+            // alih-alih ditolak aturan `decimal`.
+            'admin_fee' => [
+                'nullable',
+                ...($isTransfer ? [] : ['prohibited']),
+                'decimal:0,2',
+                'min:0.01',
+                'max:99999999999',
+            ],
+
             'attachment' => [
                 'nullable',
                 'file',
@@ -116,6 +134,10 @@ class TransactionRequest extends FormRequest
             'transfer_to_account_id.exists' => __('Akun tujuan tidak ditemukan di workspace ini.'),
             'tag_ids.max' => __('Maksimal 10 tag per transaksi.'),
             'tag_ids.*.exists' => __('Tag tidak ditemukan di workspace ini.'),
+            'admin_fee.prohibited' => __('Hanya transfer yang punya potongan admin.'),
+            'admin_fee.decimal' => __('Potongan admin maksimal dua angka desimal.'),
+            'admin_fee.min' => __('Potongan admin harus lebih besar dari nol.'),
+            'admin_fee.max' => __('Potongan admin terlalu besar.'),
             'attachment.mimes' => __('Lampiran harus gambar (jpg, png, webp) atau PDF.'),
             'attachment.max' => __('Ukuran lampiran maksimal 2 MB.'),
         ];
@@ -135,6 +157,7 @@ class TransactionRequest extends FormRequest
             'category_id' => __('kategori'),
             'transfer_to_account_id' => __('akun tujuan'),
             'tag_ids' => __('tag'),
+            'admin_fee' => __('potongan admin'),
             'attachment' => __('lampiran'),
         ];
     }
@@ -177,6 +200,23 @@ class TransactionRequest extends FormRequest
     public function shouldRemoveAttachment(): bool
     {
         return $this->boolean('remove_attachment');
+    }
+
+    /**
+     * Potongan admin dalam sen, atau null kalau tidak diisi.
+     *
+     * Dibalik ke sen supaya TransactionManager bebas menentukan formatnya;
+     * input user sudah dibatasi dua desimal oleh aturan `decimal:0,2`.
+     */
+    public function adminFeeCents(): ?int
+    {
+        $value = $this->validated('admin_fee');
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return Money::toCents($value);
     }
 
     private function type(): ?TransactionType

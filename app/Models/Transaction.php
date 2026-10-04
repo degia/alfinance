@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\TransactionStatus;
 use App\Enums\TransactionType;
+use App\Services\Transactions\AdminFeeManager;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Database\Factories\TransactionFactory;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
 
 /**
@@ -27,11 +29,16 @@ use Illuminate\Support\Collection;
  * Transaksi berstatus `pending` (transaksi berulang yang perlu konfirmasi)
  * belum boleh memengaruhi saldo — lihat {@see balanceDeltas()}.
  *
+ * `parent_transaction_id` hanya terisi pada baris turunan: potongan admin
+ * sebuah transfer dicatat sebagai `expense` biasa yang menunjuk transfer
+ * induknya, supaya biayanya bisa ikut diperbarui/dihapus bersamanya.
+ *
  * @property int $id
  * @property int $workspace_id
  * @property int $account_id
  * @property int|null $transfer_to_account_id
  * @property int|null $category_id
+ * @property int|null $parent_transaction_id
  * @property int|null $recurring_rule_id
  * @property TransactionType $type
  * @property string $amount
@@ -47,6 +54,7 @@ use Illuminate\Support\Collection;
     'account_id',
     'transfer_to_account_id',
     'category_id',
+    'parent_transaction_id',
     'recurring_rule_id',
     'type',
     'amount',
@@ -72,6 +80,7 @@ class Transaction extends WorkspaceScopedModel
             'account_id' => 'integer',
             'transfer_to_account_id' => 'integer',
             'category_id' => 'integer',
+            'parent_transaction_id' => 'integer',
             'recurring_rule_id' => 'integer',
             'created_by' => 'integer',
             'updated_by' => 'integer',
@@ -151,6 +160,30 @@ class Transaction extends WorkspaceScopedModel
     public function recurringRule(): BelongsTo
     {
         return $this->belongsTo(RecurringRule::class, 'recurring_rule_id');
+    }
+
+    /**
+     * Transaksi induk untuk baris turunan (potongan admin sebuah transfer).
+     *
+     * @return BelongsTo<Transaction, $this>
+     */
+    public function parentTransaction(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_transaction_id');
+    }
+
+    /**
+     * Baris pengeluaran "Biaya Admin" milik transfer ini, kalau ada.
+     *
+     * Satu transfer maksimum punya satu potongan admin, jadi relasinya
+     * `hasOne`. Dipakai {@see AdminFeeManager} untuk
+     * menyinkronkan baris tersebut setiap kali transfer berubah.
+     *
+     * @return HasOne<Transaction, $this>
+     */
+    public function adminFee(): HasOne
+    {
+        return $this->hasOne(self::class, 'parent_transaction_id');
     }
 
     /*
@@ -283,6 +316,15 @@ class Transaction extends WorkspaceScopedModel
     public function isTransfer(): bool
     {
         return $this->type->isTransfer();
+    }
+
+    /**
+     * Baris pengeluaran yang dihasilkan otomatis oleh sebuah transfer
+     * (potongan admin), bukan catatan yang diketik user langsung.
+     */
+    public function isAdminFee(): bool
+    {
+        return $this->parent_transaction_id !== null;
     }
 
     public function isPending(): bool

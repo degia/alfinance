@@ -636,10 +636,21 @@ function typeIcon(type: TransactionType) {
                                         }}
                                     </span>
                                     <div
-                                        v-if="transaction.is_pending"
+                                        v-if="
+                                            transaction.is_pending ||
+                                            transaction.is_admin_fee
+                                        "
                                         class="mt-1 flex items-center justify-end gap-1"
                                     >
                                         <Badge
+                                            v-if="transaction.is_admin_fee"
+                                            variant="outline"
+                                            class="text-2xs"
+                                        >
+                                            Potongan admin
+                                        </Badge>
+                                        <Badge
+                                            v-if="transaction.is_pending"
                                             variant="outline"
                                             class="text-2xs"
                                         >

@@ -63,6 +63,7 @@ const emptyForm = (): TransactionFormData => ({
     category_id: '',
     type: 'expense',
     amount: '',
+    admin_fee: '',
     occurred_at: today(),
     note: '',
     tag_ids: [],
@@ -134,6 +135,7 @@ function hydrate(transaction: TransactionListItem): void {
         category_id: category?.id ?? '',
         type: transaction.type,
         amount: transaction.amount,
+        admin_fee: transaction.admin_fee ?? '',
         occurred_at: transaction.occurred_at,
         note: transaction.note ?? '',
         tag_ids: [...transaction.tag_ids],
@@ -166,6 +168,7 @@ watch(isTransfer, (transfer) => {
         form.category_id = '';
     } else {
         form.transfer_to_account_id = '';
+        form.admin_fee = '';
     }
 });
 
@@ -379,6 +382,34 @@ function submit(): void {
                             Selalu positif — arahnya ditentukan tipe transaksi.
                         </p>
                         <InputError :message="form.errors.amount" />
+                    </div>
+                </div>
+
+                <!--
+                    Potongan admin hanya ada di transfer: nilainya dicatat sebagai
+                    pengeluaran terpisah kategori "Biaya Admin" di akun sumber,
+                    bukan dipotong dari nominal yang sampai ke akun tujuan.
+                -->
+                <div v-if="isTransfer" class="grid gap-4 md:grid-cols-2">
+                    <div class="grid gap-2">
+                        <Label for="transaction-admin-fee">
+                            Potongan admin
+                        </Label>
+                        <Input
+                            id="transaction-admin-fee"
+                            v-model="form.admin_fee"
+                            name="admin_fee"
+                            type="text"
+                            inputmode="decimal"
+                            placeholder="0"
+                            class="shadow-neu-inset"
+                            :aria-invalid="Boolean(form.errors.admin_fee)"
+                        />
+                        <p class="text-xs text-muted-foreground">
+                            Opsional — dicatat sebagai pengeluaran "Biaya
+                            Admin" dari akun sumber.
+                        </p>
+                        <InputError :message="form.errors.admin_fee" />
                     </div>
                 </div>
 

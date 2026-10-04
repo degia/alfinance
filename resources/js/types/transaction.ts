@@ -71,6 +71,13 @@ export type TransactionListItem = {
     tag_ids: number[];
     attachments: TransactionAttachment[];
     is_recurring_instance: boolean;
+    /**
+     * Nominal potongan admin milik transfer ini, atau null kalau tidak punya.
+     * Dipakai form edit untuk mengisi ulang field potongan admin.
+     */
+    admin_fee: string | null;
+    /** Baris ini adalah pengeluaran "Biaya Admin" hasil dari sebuah transfer. */
+    is_admin_fee: boolean;
 };
 
 export type TransactionFilters = {
@@ -126,6 +133,11 @@ export type TransactionFormData = {
     category_id: number | '';
     type: TransactionType;
     amount: string;
+    /**
+     * Potongan admin transfer dalam rupiah penuh (string desimal), bukan sen.
+     * Hanya dikirim untuk tipe `transfer`; server menolaknya untuk tipe lain.
+     */
+    admin_fee: string;
     occurred_at: string;
     note: string;
     tag_ids: number[];
