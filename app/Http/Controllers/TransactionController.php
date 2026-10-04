@@ -342,9 +342,10 @@ class TransactionController extends Controller
      * Satu query kecil tanpa cache: daftar akun itu master data yang sudah
      * dimuat form filter, dan `accounts.cached_balance` memang sudah
      * dipelihara TransactionManager setiap kali saldo berubah — bukan angka
-     * yang harus dihitung ulang dari transaksi. Kartu kredit ikut dikirim
-     * (saldanya negatif = utang) supaya panel ini menampilkan semua akun,
-     * tapi tidak ikut dijumlahkan ke total, sama seperti halaman Akun.
+     * yang harus dihitung ulang dari transaksi. Kartu kredit (saldanya negatif
+     * = utang) dan tabungan (sudah disisihkan) tetap ikut dikirim supaya panel
+     * ini menampilkan semua akun, tapi keduanya tidak ikut dijumlahkan ke
+     * total — sama seperti halaman Akun dan Dashboard.
      *
      * @return array{accounts: array<int, array<string, mixed>>, total: string}
      */
@@ -358,7 +359,7 @@ class TransactionController extends Controller
         $total = Money::fromCents(0);
 
         $items = $accounts->map(function (Account $account) use (&$total): array {
-            if (! $account->isCredit()) {
+            if ($account->type->countsInTotalBalance()) {
                 $total = Money::add($total, $account->cached_balance);
             }
 

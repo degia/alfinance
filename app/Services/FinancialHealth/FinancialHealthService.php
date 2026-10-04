@@ -260,11 +260,12 @@ class FinancialHealthService
     }
 
     /**
-     * Saldo kas likuid dalam sen: akun aktif non-liabilitas yang saldonya
-     * tidak negatif.
+     * Saldo kas likuid dalam sen: akun aktif yang saldonya tidak negatif dan
+     * memang boleh dibelanjakan.
      *
      * Kartu kredit adalah kewajiban, jadi tidak boleh dihitung sebagai dana
-     * darurat; saldo negatif juga bukan kas.
+     * darurat; saldo negatif juga bukan kas. Akun tabungan ikut dikeluarkan:
+     * uangnya sudah disisihkan, bukan dana darurat untuk dibelanjakan.
      */
     private function liquidCash(int $workspaceId): int
     {
@@ -276,7 +277,7 @@ class FinancialHealthService
         $liquid = 0;
 
         foreach ($accounts as $account) {
-            if ($account->isCredit()) {
+            if (! $account->type->countsInTotalBalance()) {
                 continue;
             }
 

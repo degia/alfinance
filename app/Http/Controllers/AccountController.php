@@ -158,7 +158,11 @@ class AccountController extends Controller
     }
 
     /**
-     * Total saldo seluruh akun aktif non-liabilitas.
+     * Total saldo seluruh akun aktif yang boleh dibelanjakan.
+     *
+     * Kartu kredit adalah kewajiban dan akun tabungan sengaja disisihkan, jadi
+     * keduanya tidak ikut total: hanya tipe dengan `countsInTotalBalance()`
+     * yang dihitung.
      *
      * Ini bukan agregat berat: jumlahnya kecil dan sudah dimuat di memori
      * pada request yang sama, jadi aman dihitung langsung. Agregat berat
@@ -172,7 +176,7 @@ class AccountController extends Controller
         $total = Money::fromCents(0);
 
         foreach ($accounts as $account) {
-            if ($account->isArchived() || $account->isCredit()) {
+            if ($account->isArchived() || ! $account->type->countsInTotalBalance()) {
                 continue;
             }
 

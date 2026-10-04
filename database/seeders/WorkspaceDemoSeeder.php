@@ -117,6 +117,7 @@ class WorkspaceDemoSeeder extends Seeder
         $transfers = [
             ['from' => 'bank', 'to' => 'cash', 'amount' => '500000.00', 'note' => 'Tarik tunai', 'day' => 7],
             ['from' => 'bank', 'to' => 'ewallet', 'amount' => '1000000.00', 'note' => 'Top up e-wallet', 'day' => 15],
+            ['from' => 'bank', 'to' => 'saving', 'amount' => '1000000.00', 'note' => 'Setor tabungan', 'day' => 20],
             // Transfer ke kartu kredit berarti membayar tagihannya: saldo kartu
             // (yang negatif = utang) naik mendekati nol. Nominalnya 1.000.000
             // supaya dari 1.128.000 belanja kartu tersisa 128.000 outstanding —
@@ -181,6 +182,7 @@ class WorkspaceDemoSeeder extends Seeder
             'cash' => Account::factory()->forWorkspace($workspace)->cash('Dompet Tunai', '450000.00')->create(),
             'bank' => Account::factory()->forWorkspace($workspace)->bank('BCA Tabungan', '12500000.00')->create(),
             'ewallet' => Account::factory()->forWorkspace($workspace)->ewallet('GoPay', '650000.00')->create(),
+            'saving' => Account::factory()->forWorkspace($workspace)->saving('Tabungan', '3000000.00')->create(),
             'card' => Account::factory()->forWorkspace($workspace)->creditCard('BCA Credit Card', '15000000.00')->create(),
         ];
     }

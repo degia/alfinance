@@ -28,8 +28,9 @@ Alfinance.com adalah aplikasi web manajemen keuangan personal bergaya SaaS multi
 
 ### 3.2 Accounts
 
-- Tipe akun: Kas/Tunai, Rekening Bank, E-Wallet, Kartu Kredit/Paylater.
+- Tipe akun: Kas/Tunai, Rekening Bank, E-Wallet, Tabungan, Kartu Kredit/Paylater.
 - Kartu kredit/paylater: field limit, tanggal cetak tagihan, tanggal jatuh tempo, sisa limit terpakai.
+- Tabungan: aset biasa (bisa bertransaksi, saldo bergerak), tapi tidak ikut "Saldo Total" dan tidak dihitung sebagai dana darurat — uangnya sudah disisihkan. Tetap dihitung sebagai aset di Kekayaan Bersih.
 - Arsip akun (soft-archive, bukan hapus) — histori transaksi tetap utuh.
 - Saldo per akun otomatis ter-update dari transaksi & transfer.
 

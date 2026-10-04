@@ -5,15 +5,21 @@ namespace App\Enums;
 /**
  * Tipe akun keuangan (PRD.md §3.2).
  *
- * `Cash`, `Bank`, dan `EWallet` behave sebagai kontainer saldo positif.
- * `CreditCard` behave sebagai liabilitas: saldo negatif berarti utang yang
- * harus dibayar, dan wajib punya limit + jadwal tagihan bulanan.
+ * `Cash`, `Bank`, `EWallet`, dan `Saving` behave sebagai kontainer saldo
+ * positif. `CreditCard` behave sebagai liabilitas: saldo negatif berarti utang
+ * yang harus dibayar, dan wajib punya limit + jadwal tagihan bulanan.
+ *
+ * `Saving` (tabungan) dicatat dan boleh bertransaksi seperti akun biasa, tapi
+ * sengaja tidak ikut "saldo total" maupun dana darurat: uangnya sudah
+ * disisihkan, bukan saldo yang bisa dibelanjakan. Kekayaan bersih tetap
+ * menghitungnya sebagai aset — menabung bukan mengurangi harta.
  */
 enum AccountType: string
 {
     case Cash = 'cash';
     case Bank = 'bank';
     case EWallet = 'ewallet';
+    case Saving = 'saving';
     case CreditCard = 'credit_card';
 
     /**
@@ -30,6 +36,7 @@ enum AccountType: string
             self::Cash => 'Kas / Tunai',
             self::Bank => 'Rekening Bank',
             self::EWallet => 'E-Wallet',
+            self::Saving => 'Tabungan',
             self::CreditCard => 'Kartu Kredit',
         };
     }
@@ -43,6 +50,7 @@ enum AccountType: string
             self::Cash => 'banknote',
             self::Bank => 'landmark',
             self::EWallet => 'smartphone',
+            self::Saving => 'piggy-bank',
             self::CreditCard => 'credit-card',
         };
     }
@@ -53,6 +61,14 @@ enum AccountType: string
     public function isLiability(): bool
     {
         return $this === self::CreditCard;
+    }
+
+    /**
+     * Akun tabungan: aset, tapi tidak termasuk saldo yang bisa dibelanjakan.
+     */
+    public function isSavings(): bool
+    {
+        return $this === self::Saving;
     }
 
     /**
@@ -71,5 +87,14 @@ enum AccountType: string
     public function allowsNegativeBalance(): bool
     {
         return $this->isLiability();
+    }
+
+    /**
+     * Ikut atau tidaknya akun ini dalam "saldo total" (dashboard, halaman
+     * Akun, panel Transaksi) dan dana darurat.
+     */
+    public function countsInTotalBalance(): bool
+    {
+        return ! $this->isLiability() && ! $this->isSavings();
     }
 }

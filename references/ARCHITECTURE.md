@@ -77,7 +77,7 @@ Transaksi baru disimpan
 - `users(id, name, email, password, ...)`
 - `workspaces(id, name, owner_id, ...)`
 - `workspace_user(workspace_id, user_id, role)`
-- `accounts(id, workspace_id, type[kas|bank|ewallet|kartu_kredit], name, cached_balance, credit_limit, billing_date, due_date, archived_at)`
+- `accounts(id, workspace_id, type[kas|bank|ewallet|tabungan|kartu_kredit], name, cached_balance, credit_limit, billing_date, due_date, archived_at)`
 - `categories(id, workspace_id, parent_id, name, icon, color)`
 - `tags(id, workspace_id, name)`
 - `transactions(id, workspace_id, account_id, type[income|expense|transfer], transfer_to_account_id, category_id, amount, note, occurred_at, is_recurring_instance_of, created_by)`

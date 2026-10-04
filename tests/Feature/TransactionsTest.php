@@ -719,6 +719,55 @@ class TransactionsTest extends TestCase
         $this->assertSame('900000.00', $archived->fresh()->cached_balance);
     }
 
+    public function test_savings_accounts_are_listed_but_left_out_of_the_total(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+
+        Account::factory()->forWorkspace($workspace)->bank('BCA', '1250000.00')->create();
+        Account::factory()->forWorkspace($workspace)->saving('Tabungan', '9000000.00')->create();
+
+        $this->get(route('transactions.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                // Tabungan tetap terlihat di panel...
+                ->has('balances.accounts', 2)
+                ->where('balances.accounts.1.name', 'Tabungan')
+                ->where('balances.accounts.1.type', 'saving')
+                ->where('balances.accounts.1.balance', '9000000.00')
+                // ...tapi tidak ikut total, karena uangnya sudah disisihkan.
+                ->where('balances.total', '1250000.00'),
+            );
+    }
+
+    public function test_a_savings_account_works_like_any_other_account(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+
+        $savings = Account::factory()->forWorkspace($workspace)->saving('Tabungan', '9000000.00')->create();
+
+        // Akun tabungan bukan read-only: setoran masuk dan biaya keluar
+        // tetap memindahkan saldonya seperti akun biasa.
+        $this->post(route('transactions.store'), [
+            'account_id' => $savings->id,
+            'type' => TransactionType::Income->value,
+            'amount' => '1500000.00',
+            'category_id' => Category::factory()->forWorkspace($workspace)->create(['name' => 'Gaji'])->id,
+            'occurred_at' => '2026-09-27',
+        ])->assertRedirect(route('transactions.index'));
+
+        $this->post(route('transactions.store'), [
+            'account_id' => $savings->id,
+            'type' => TransactionType::Expense->value,
+            'amount' => '250000.00',
+            'category_id' => Category::factory()->forWorkspace($workspace)->create(['name' => 'Biaya'])->id,
+            'occurred_at' => '2026-09-28',
+        ])->assertRedirect(route('transactions.index'));
+
+        $this->assertSame('10250000.00', $savings->fresh()->cached_balance);
+    }
+
     public function test_transactions_require_an_active_workspace(): void
     {
         $user = User::factory()->create();

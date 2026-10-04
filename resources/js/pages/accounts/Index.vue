@@ -48,6 +48,7 @@ const typeOptions: { value: AccountType; label: string }[] = [
     { value: 'cash', label: 'Kas / Tunai' },
     { value: 'bank', label: 'Rekening Bank' },
     { value: 'ewallet', label: 'E-Wallet' },
+    { value: 'saving', label: 'Tabungan' },
     { value: 'credit_card', label: 'Kartu Kredit' },
 ];
 

@@ -74,6 +74,16 @@ class AccountFactory extends Factory
     /**
      * Kartu kredit: limit, hari cetak tagihan, dan hari jatuh tempo terisi.
      */
+    public function saving(string $name = 'Tabungan', string $balance = '0.00'): static
+    {
+        return $this->state(fn (): array => [
+            'type' => AccountType::Saving->value,
+            'name' => $name,
+            'initial_balance' => $balance,
+            'cached_balance' => $balance,
+        ]);
+    }
+
     public function creditCard(
         string $name = 'Kartu Kredit',
         string $limit = '10000000.00',

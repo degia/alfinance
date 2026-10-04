@@ -330,7 +330,11 @@ class DashboardService
     }
 
     /**
-     * Total saldo seluruh akun aktif non-liabilitas.
+     * Total saldo seluruh akun aktif yang boleh dibelanjakan.
+     *
+     * Kartu kredit adalah kewajiban dan akun tabungan sengaja disisihkan, jadi
+     * keduanya tidak dihitung: hanya tipe dengan `countsInTotalBalance()` yang
+     * ikut.
      *
      * Semuanya dibaca dari `accounts.cached_balance` — kolom yang sengaja
      * di-maintain di jalur tulis transaksi (ARCHITECTURE.md §2.1 butir 2),
@@ -347,7 +351,7 @@ class DashboardService
         $total = 0;
 
         foreach ($accounts as $account) {
-            if ($account->isCredit()) {
+            if (! $account->type->countsInTotalBalance()) {
                 continue;
             }
 

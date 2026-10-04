@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { Banknote, CreditCard, Landmark, Smartphone } from '@lucide/vue';
+import {
+    Banknote,
+    CreditCard,
+    Landmark,
+    PiggyBank,
+    Smartphone,
+} from '@lucide/vue';
 import type { Component } from 'vue';
 
 /**
@@ -10,6 +16,7 @@ const icons: Record<string, Component> = {
     banknote: Banknote,
     landmark: Landmark,
     smartphone: Smartphone,
+    'piggy-bank': PiggyBank,
     'credit-card': CreditCard,
 };
 

@@ -99,6 +99,15 @@ class Account extends WorkspaceScopedModel
     }
 
     /**
+     * Akun tabungan: boleh bertransaksi seperti akun biasa, tapi tidak ikut
+     * dihitung dalam "saldo total" dan dana darurat.
+     */
+    public function isSavings(): bool
+    {
+        return $this->type->isSavings();
+    }
+
+    /**
      * Arsipkan akun (soft-archive, PRD.md §3.2).
      */
     public function archive(): void

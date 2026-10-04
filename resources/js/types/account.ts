@@ -1,4 +1,9 @@
-export type AccountType = 'cash' | 'bank' | 'ewallet' | 'credit_card';
+export type AccountType =
+    | 'cash'
+    | 'bank'
+    | 'ewallet'
+    | 'saving'
+    | 'credit_card';
 
 export type AccountListItem = {
     id: number;

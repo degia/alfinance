@@ -80,6 +80,54 @@ class AccountsTest extends TestCase
         $this->assertSame($user->workspaces()->sole()->id, $account->workspace_id);
     }
 
+    public function test_a_savings_account_can_be_created_and_is_listed_with_its_own_type(): void
+    {
+        $this->signedIn();
+
+        $this->post(route('accounts.store'), [
+            'name' => 'Tabungan Plans',
+            'type' => AccountType::Saving->value,
+            'initial_balance' => '2500000.00',
+        ])->assertRedirect(route('accounts.index'));
+
+        $account = Account::allWorkspaces()->sole();
+
+        $this->assertSame(AccountType::Saving, $account->type);
+        $this->assertSame('2500000.00', $account->cached_balance);
+        // Kartu kredit jelas bukan tabungan: field miliknya tidak ikut tersimpan.
+        $this->assertNull($account->credit_limit);
+        $this->assertNull($account->billing_day);
+        $this->assertNull($account->due_day);
+
+        $this->get(route('accounts.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('accounts.0.name', 'Tabungan Plans')
+                ->where('accounts.0.type', 'saving')
+                ->where('accounts.0.type_label', 'Tabungan')
+                ->where('accounts.0.type_icon', 'piggy-bank')
+                ->where('accounts.0.is_credit', false),
+            );
+    }
+
+    public function test_the_total_balance_excludes_savings_accounts(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+
+        Account::factory()->forWorkspace($workspace)->cash('Dompet Tunai', '450000.00')->create();
+        Account::factory()->forWorkspace($workspace)->bank('BCA', '1250000.00')->create();
+        // Disisihkan, jadi tidak boleh menambah "saldo total".
+        Account::factory()->forWorkspace($workspace)->saving('Tabungan', '9000000.00')->create();
+
+        $this->get(route('accounts.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('accounts', 3)
+                ->where('totalBalance', '1700000.00'),
+            );
+    }
+
     public function test_credit_cards_require_limit_and_billing_schedule(): void
     {
         $this->signedIn();
