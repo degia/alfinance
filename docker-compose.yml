@@ -1,0 +1,45 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: alfinance_app
+    restart: always
+    volumes:
+      - .:/var/www
+    environment:
+      - DB_HOST=192.168.20.5
+      - DB_PORT=3308
+      - DB_DATABASE=alfinance
+      - DB_USERNAME=dev
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - alfinance_net
+
+  redis:
+    image: redis:alpine
+    container_name: alfinance_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - alfinance_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: alfinance_nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - app
+    networks:
+      - alfinance_net
+
+networks:
+  alfinance_net:
+    driver: bridge
