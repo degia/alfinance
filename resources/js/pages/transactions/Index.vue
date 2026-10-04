@@ -4,6 +4,8 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import {
     ArrowLeftRight,
     Check,
+    ChevronDown,
+    ChevronUp,
     Filter,
     Paperclip,
     Pencil,
@@ -13,8 +15,10 @@ import {
     Trash2,
     TrendingDown,
     TrendingUp,
+    Wallet,
     X,
 } from '@lucide/vue';
+import AccountIcon from '@/components/AccountIcon.vue';
 import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,6 +44,7 @@ import {
 } from '@/routes/transactions';
 import { index as recurringIndex } from '@/routes/recurring-rules';
 import type {
+    TransactionBalances,
     TransactionFilters,
     TransactionListItem,
     TransactionOptions,
@@ -62,6 +67,7 @@ const props = defineProps<{
     pagination: TransactionPagination;
     filters: TransactionFilters;
     summary: TransactionSummary;
+    balances: TransactionBalances;
     options: TransactionOptions;
 }>();
 
@@ -82,6 +88,10 @@ const showFilters = ref(
 );
 
 const NONE = '__none__';
+
+// Panel saldo default terbuka: ini informasi yang paling sering dicari saat
+// membuka menu Transaksi. Bisa ditutup kalau sedang fokus pada filter.
+const showBalances = ref(true);
 
 const typeOptions: { value: TransactionType; label: string }[] = [
     { value: 'expense', label: 'Pengeluaran' },
@@ -164,6 +174,15 @@ function applyFilters(page = 1): void {
         }),
         { preserveScroll: true, replace: true },
     );
+}
+
+function filterByAccount(accountId: number): void {
+    form.value.account_id =
+        form.value.account_id === String(accountId)
+            ? NONE
+            : String(accountId);
+
+    applyFilters();
 }
 
 function resetFilters(): void {
@@ -295,6 +314,99 @@ function typeIcon(type: TransactionType) {
                 </CardContent>
             </Card>
         </div>
+
+        <Card class="rounded-2xl border-0 shadow-neu-flat">
+            <CardContent class="flex flex-col gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <button
+                        type="button"
+                        class="flex items-center gap-2 text-left"
+                        :aria-expanded="showBalances"
+                        @click="showBalances = !showBalances"
+                    >
+                        <Wallet class="size-4 text-primary" />
+                        <span class="text-sm font-medium">Saldo akun</span>
+                        <component
+                            :is="showBalances ? ChevronUp : ChevronDown"
+                            class="size-4 text-muted-foreground"
+                        />
+                    </button>
+
+                    <p class="text-xs text-muted-foreground">
+                        Total saldo
+                        <span class="font-semibold text-foreground tabular-nums">
+                            {{ formatCurrency(balances.total) }}
+                        </span>
+                    </p>
+                </div>
+
+                <div
+                    v-if="showBalances"
+                    class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+                >
+                    <button
+                        v-for="account in balances.accounts"
+                        :key="account.id"
+                        type="button"
+                        class="flex flex-col gap-2 rounded-xl p-3 text-left transition-colors hover:bg-accent"
+                        :class="{
+                            'bg-accent shadow-neu-inset':
+                                filters.account_id === account.id,
+                        }"
+                        :title="
+                            filters.account_id === account.id
+                                ? 'Klik untuk membatalkan filter akun ini'
+                                : 'Klik untuk memfilter transaksi akun ini'
+                        "
+                        @click="filterByAccount(account.id)"
+                    >
+                        <div class="flex items-center gap-3">
+                            <span
+                                class="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"
+                            >
+                                <AccountIcon :icon="account.type_icon" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-medium">
+                                    {{ account.name }}
+                                </p>
+                                <p class="text-xs text-muted-foreground">
+                                    {{ account.type_label }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <p
+                            class="text-lg font-semibold tabular-nums"
+                            :class="
+                                Number(account.balance) < 0
+                                    ? 'text-expense'
+                                    : 'text-foreground'
+                            "
+                        >
+                            {{ formatCurrency(account.balance) }}
+                        </p>
+
+                        <p
+                            v-if="account.is_credit && account.credit_limit"
+                            class="text-xs text-muted-foreground"
+                        >
+                            Limit terpakai {{ account.credit_usage_percent ?? 0 }}%
+                            · sisa
+                            {{ formatCurrency(account.available_credit ?? '0') }}
+                        </p>
+                    </button>
+
+                    <p
+                        v-if="balances.accounts.length === 0"
+                        class="text-sm text-muted-foreground sm:col-span-2 xl:col-span-4"
+                    >
+                        Belum ada akun. Tambahkan akun dulu untuk mulai mencatat
+                        transaksi.
+                    </p>
+                </div>
+            </CardContent>
+        </Card>
 
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2">

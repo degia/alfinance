@@ -111,6 +111,7 @@ class TransactionController extends Controller
                 'search' => $filters['search'],
             ],
             'summary' => $this->summary($filters),
+            'balances' => $this->accountBalances(),
             'options' => $this->formOptions(),
         ]);
     }
@@ -333,6 +334,52 @@ class TransactionController extends Controller
             ->when($filters['status'] !== null, fn ($query) => $query->where('status', $filters['status']->value))
             ->amountBetween($filters['amount_min'], $filters['amount_max'])
             ->searching($filters['search']);
+    }
+
+    /**
+     * Saldo terkini semua akun aktif untuk panel "Saldo Akun" di halaman ini.
+     *
+     * Satu query kecil tanpa cache: daftar akun itu master data yang sudah
+     * dimuat form filter, dan `accounts.cached_balance` memang sudah
+     * dipelihara TransactionManager setiap kali saldo berubah — bukan angka
+     * yang harus dihitung ulang dari transaksi. Kartu kredit ikut dikirim
+     * (saldanya negatif = utang) supaya panel ini menampilkan semua akun,
+     * tapi tidak ikut dijumlahkan ke total, sama seperti halaman Akun.
+     *
+     * @return array{accounts: array<int, array<string, mixed>>, total: string}
+     */
+    private function accountBalances(): array
+    {
+        $accounts = Account::query()
+            ->active()
+            ->orderBy('name')
+            ->get(['id', 'name', 'type', 'cached_balance', 'credit_limit']);
+
+        $total = Money::fromCents(0);
+
+        $items = $accounts->map(function (Account $account) use (&$total): array {
+            if (! $account->isCredit()) {
+                $total = Money::add($total, $account->cached_balance);
+            }
+
+            return [
+                'id' => $account->id,
+                'name' => $account->name,
+                'type' => $account->type->value,
+                'type_label' => $account->type->label(),
+                'type_icon' => $account->type->icon(),
+                'is_credit' => $account->isCredit(),
+                'balance' => $account->cached_balance,
+                'credit_limit' => $account->credit_limit,
+                'available_credit' => $account->availableCredit(),
+                'credit_usage_percent' => $account->creditUsagePercent(),
+            ];
+        })->values();
+
+        return [
+            'accounts' => $items->all(),
+            'total' => $total,
+        ];
     }
 
     /**

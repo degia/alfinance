@@ -1,3 +1,5 @@
+import type { AccountType } from './account';
+
 export type TransactionType = 'income' | 'expense' | 'transfer';
 
 export type TransactionStatus = 'posted' | 'pending';
@@ -127,6 +129,32 @@ export type TransactionSummary = {
      */
     net: string;
     pending_count: number;
+};
+
+/**
+ * Satu akun di panel "Saldo Akun" halaman Transaksi. Uang tetap string desimal
+ * supaya presisi DECIMAL(15,2) tidak hilang di JavaScript.
+ */
+export type AccountBalance = {
+    id: number;
+    name: string;
+    type: AccountType;
+    type_label: string;
+    type_icon: string;
+    is_credit: boolean;
+    balance: string;
+    credit_limit: string | null;
+    available_credit: string | null;
+    credit_usage_percent: number | null;
+};
+
+/**
+ * `@see TransactionController::accountBalances()`. `total` menjumlahkan akun
+ * non-liabilitas saja; saldo kartu kredit negatif jadi tidak ikut total.
+ */
+export type TransactionBalances = {
+    accounts: AccountBalance[];
+    total: string;
 };
 
 export type TransactionPagination = {

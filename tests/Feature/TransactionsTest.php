@@ -644,6 +644,81 @@ class TransactionsTest extends TestCase
         $this->assertSame('100000.00', $source->fresh()->cached_balance);
     }
 
+    public function test_the_index_lists_the_current_balance_of_every_account(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+
+        $cash = Account::factory()->forWorkspace($workspace)->cash('Dompet Tunai', '250000.00')->create();
+        $bank = Account::factory()->forWorkspace($workspace)->bank('BCA', '1250000.00')->create();
+        $card = Account::factory()->forWorkspace($workspace)->creditCard('Kartu Utama', '5000000.00')->create();
+
+        // Saldo kartu kredit negatif = utang, jadi harus ikut tampil tapi tidak
+        // ikut dijumlahkan ke total. Dicatat lewat form supaya `cached_balance`
+        // benar-benar bergerak.
+        $this->post(route('transactions.store'), [
+            'account_id' => $card->id,
+            'type' => TransactionType::Expense->value,
+            'amount' => '750000.00',
+            'occurred_at' => '2026-09-27',
+        ])->assertRedirect(route('transactions.index'));
+
+        $this->get(route('transactions.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('transactions/Index')
+                ->has('balances.accounts', 3)
+                // Urutan ikut nama akun, sama seperti daftar di menu Akun.
+                ->where('balances.accounts.0.id', $bank->id)
+                ->where('balances.accounts.0.name', 'BCA')
+                ->where('balances.accounts.0.type', 'bank')
+                ->where('balances.accounts.0.type_label', 'Rekening Bank')
+                ->where('balances.accounts.0.type_icon', 'landmark')
+                ->where('balances.accounts.0.is_credit', false)
+                ->where('balances.accounts.0.balance', '1250000.00')
+                ->where('balances.accounts.1.id', $cash->id)
+                ->where('balances.accounts.1.type', 'cash')
+                ->where('balances.accounts.1.balance', '250000.00')
+                ->where('balances.accounts.1.credit_limit', null)
+                ->where('balances.accounts.2.id', $card->id)
+                ->where('balances.accounts.2.is_credit', true)
+                ->where('balances.accounts.2.balance', '-750000.00')
+                ->where('balances.accounts.2.credit_limit', '5000000.00')
+                ->where('balances.accounts.2.available_credit', '4250000.00')
+                ->where('balances.accounts.2.credit_usage_percent', 15)
+                ->where('balances.total', '1500000.00'),
+            );
+    }
+
+    public function test_the_balance_panel_follows_the_latest_balance_and_skips_archived_accounts(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+
+        $account = Account::factory()->forWorkspace($workspace)->cash('Dompet Tunai', '500000.00')->create();
+        $archived = Account::factory()->forWorkspace($workspace)->bank('Bank Lama', '900000.00')->archived()->create();
+
+        $this->post(route('transactions.store'), [
+            'account_id' => $account->id,
+            'type' => TransactionType::Expense->value,
+            'amount' => '125000.00',
+            'category_id' => Category::factory()->forWorkspace($workspace)->create(['name' => 'Makan'])->id,
+            'occurred_at' => '2026-09-27',
+        ])->assertRedirect(route('transactions.index'));
+
+        $this->get(route('transactions.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('balances.accounts', 1)
+                ->where('balances.accounts.0.id', $account->id)
+                ->where('balances.accounts.0.balance', '375000.00')
+                ->where('balances.total', '375000.00'),
+            );
+
+        // Akun terarsip tetap utuh, cuma tidak ditampilkan di panel.
+        $this->assertSame('900000.00', $archived->fresh()->cached_balance);
+    }
+
     public function test_transactions_require_an_active_workspace(): void
     {
         $user = User::factory()->create();
