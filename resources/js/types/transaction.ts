@@ -29,6 +29,19 @@ export type TransactionCategory = TransactionOption & {
 };
 
 /**
+ * Utang yang harus dibayar untuk select "Bayar utang" di form transaksi.
+ * Server sudah menyaring yang lunas dan mengurutkan yang paling mendesak dulu,
+ * jadi frontend tinggal memaparkannya.
+ */
+export type TransactionDebtOption = {
+    id: number;
+    counterparty: string;
+    remaining: string;
+    due_date: string | null;
+    status_label: string;
+};
+
+/**
  * Opsi kategori untuk select form dan filter: daftar datar dengan kategori
  * utama lebih dulu lalu sub-kategorinya, ditandai lewat `parent_id`.
  */
@@ -84,6 +97,11 @@ export type TransactionListItem = {
     admin_fee_category_id: number | null;
     /** Baris ini adalah pengeluaran "Biaya Admin" hasil dari sebuah transfer. */
     is_admin_fee: boolean;
+    /** Utang yang dilunasi expense ini, untuk mengisi select di form edit. */
+    debt_id: number | null;
+    debt: { id: number; counterparty: string } | null;
+    /** Baris ini adalah pembayaran utang, bukan pengeluaran biasa. */
+    is_debt_payment: boolean;
 };
 
 export type TransactionFilters = {
@@ -126,6 +144,8 @@ export type TransactionOptions = {
     accounts: TransactionAccountOption[];
     categories: TransactionCategoryOption[];
     tags: TransactionTag[];
+    /** Utang yang masih punya sisa, untuk select "Bayar utang". */
+    debts: TransactionDebtOption[];
 };
 
 /**
@@ -149,6 +169,11 @@ export type TransactionFormData = {
      * "Biaya Admin", jadi tidak wajib diisi.
      */
     admin_fee_category_id: number | '';
+    /**
+     * Utang yang dilunasi expense ini. `''` berarti pengeluaran biasa; server
+     * menolak field ini untuk income/transfer.
+     */
+    debt_id: number | '';
     occurred_at: string;
     note: string;
     tag_ids: number[];

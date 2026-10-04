@@ -186,6 +186,21 @@ class Transaction extends WorkspaceScopedModel
         return $this->hasOne(self::class, 'parent_transaction_id');
     }
 
+    /**
+     * Cicilan utang yang dibayar oleh expense ini, kalau ada.
+     *
+     * Tautannya disimpan di `debt_payments.transaction_id`, bukan kolom di
+     * tabel ini, supaya riwayat cicilan modul Utang & Piutang punya satu
+     * sumber kebenaran untuk pembayaran yang dicatat dari modul Transaksi
+     * maupun dari modul Utang.
+     *
+     * @return HasOne<DebtPayment, $this>
+     */
+    public function debtPayment(): HasOne
+    {
+        return $this->hasOne(DebtPayment::class, 'transaction_id');
+    }
+
     /*
      |--------------------------------------------------------------------------
      | Scope filter (ARCHITECTURE.md §2.1.5)
@@ -318,6 +333,11 @@ class Transaction extends WorkspaceScopedModel
         return $this->type->isTransfer();
     }
 
+    public function isExpense(): bool
+    {
+        return $this->type->isExpense();
+    }
+
     /**
      * Baris pengeluaran yang dihasilkan otomatis oleh sebuah transfer
      * (potongan admin), bukan catatan yang diketik user langsung.
@@ -325,6 +345,20 @@ class Transaction extends WorkspaceScopedModel
     public function isAdminFee(): bool
     {
         return $this->parent_transaction_id !== null;
+    }
+
+    /**
+     * Baris ini adalah pembayaran utang — dipakai untuk badge di daftar
+     * transaksi.
+     *
+     * Kalau relasinya sudah di-eager-load, jawabannya diambil dari sana supaya
+     * daftar transaksi tidak memicu satu query per baris.
+     */
+    public function isDebtPayment(): bool
+    {
+        return $this->relationLoaded('debtPayment')
+            ? $this->getRelation('debtPayment') !== null
+            : $this->debtPayment()->exists();
     }
 
     public function isPending(): bool

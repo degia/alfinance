@@ -638,7 +638,8 @@ function typeIcon(type: TransactionType) {
                                     <div
                                         v-if="
                                             transaction.is_pending ||
-                                            transaction.is_admin_fee
+                                            transaction.is_admin_fee ||
+                                            transaction.is_debt_payment
                                         "
                                         class="mt-1 flex items-center justify-end gap-1"
                                     >
@@ -648,6 +649,13 @@ function typeIcon(type: TransactionType) {
                                             class="text-2xs"
                                         >
                                             Potongan admin
+                                        </Badge>
+                                        <Badge
+                                            v-if="transaction.is_debt_payment"
+                                            variant="outline"
+                                            class="text-2xs"
+                                        >
+                                            Bayar utang
                                         </Badge>
                                         <Badge
                                             v-if="transaction.is_pending"

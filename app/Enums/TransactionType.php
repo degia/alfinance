@@ -57,6 +57,15 @@ enum TransactionType: string
     }
 
     /**
+     * Pengeluaran? Dipakai untuk feature yang hanya berlaku di pengeluaran,
+     *mis. melunasi utang ("Bayar utang").
+     */
+    public function isExpense(): bool
+    {
+        return $this === self::Expense;
+    }
+
+    /**
      * Tipe ini wajib punya kategori? Transfer antar akun tidak berkategori
      * karena bukan pengeluaran/pemasukan.
      */

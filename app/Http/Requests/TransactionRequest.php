@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\TransactionType;
 use App\Models\Workspace;
+use App\Services\Debt\DebtPaymentManager;
 use App\Services\Transactions\AdminFeeManager;
 use App\Support\Money;
 use App\Support\Workspace\ActiveWorkspace;
@@ -18,6 +19,11 @@ use Illuminate\Validation\Rule;
  * - income/expense tidak boleh punya akun tujuan, kategori opsional
  *   (dipakai sebagai dimensi laporan, bukan kolom wajib);
  * - transfer wajib akun tujuan yang berbeda dari akun sumber dan tidak berkategori.
+ *
+ * `debt_id` (Bayar utang) hanya berlaku untuk expense, dan hanya untuk utang
+ * milik workspace yang sama — sisa utangnya dikurangi lewat
+ * {@see DebtPaymentManager}, bukan lewat kolom di baris
+ * transaksi.
  *
  * `admin_fee` (potongan admin) juga hanya berlaku untuk transfer: nilainya tidak
  * disimpan di baris transfer, tapi dicatat sebagai baris `expense` terpisah
@@ -44,6 +50,7 @@ class TransactionRequest extends FormRequest
         $workspaceId = $this->workspaceId();
         $type = $this->type();
         $isTransfer = $type?->isTransfer() ?? false;
+        $isExpense = $type === TransactionType::Expense;
 
         return [
             'account_id' => [
@@ -112,6 +119,15 @@ class TransactionRequest extends FormRequest
                 Rule::exists('categories', 'id')->where('workspace_id', $workspaceId),
             ],
 
+            // Utang yang dilunasi expense ini ("Bayar utang"). Validasi arah,
+            // sisa, dan minimal nominal tetap di `DebtPaymentManager`, karena
+            // sisa utang ikut berubah setiap ada cicilan baru.
+            'debt_id' => [
+                'nullable',
+                ...($isExpense ? [] : ['prohibited']),
+                Rule::exists('debts', 'id')->where('workspace_id', $workspaceId),
+            ],
+
             'attachment' => [
                 'nullable',
                 'file',
@@ -151,6 +167,8 @@ class TransactionRequest extends FormRequest
             'admin_fee.max' => __('Potongan admin terlalu besar.'),
             'admin_fee_category_id.prohibited' => __('Hanya transfer yang punya potongan admin.'),
             'admin_fee_category_id.exists' => __('Kategori tidak ditemukan di workspace ini.'),
+            'debt_id.prohibited' => __('Hanya pengeluaran yang bisa melunasi utang.'),
+            'debt_id.exists' => __('Utang tidak ditemukan di workspace ini.'),
             'attachment.mimes' => __('Lampiran harus gambar (jpg, png, webp) atau PDF.'),
             'attachment.max' => __('Ukuran lampiran maksimal 2 MB.'),
         ];
@@ -172,6 +190,7 @@ class TransactionRequest extends FormRequest
             'tag_ids' => __('tag'),
             'admin_fee' => __('potongan admin'),
             'admin_fee_category_id' => __('kategori potongan admin'),
+            'debt_id' => __('utang'),
             'attachment' => __('lampiran'),
         ];
     }
@@ -185,6 +204,7 @@ class TransactionRequest extends FormRequest
     {
         $type = $this->type();
         $isTransfer = $type?->isTransfer() ?? false;
+        $isExpense = $type === TransactionType::Expense;
 
         return [
             'account_id' => (int) $this->validated('account_id'),
@@ -240,6 +260,16 @@ class TransactionRequest extends FormRequest
     public function adminFeeCategoryId(): ?int
     {
         $value = $this->validated('admin_fee_category_id');
+
+        return $value === null || $value === '' ? null : (int) $value;
+    }
+
+    /**
+     * Utang yang dilunasi expense ini, atau null kalau expense biasa.
+     */
+    public function debtId(): ?int
+    {
+        $value = $this->validated('debt_id');
 
         return $value === null || $value === '' ? null : (int) $value;
     }

@@ -9,10 +9,13 @@ use App\Http\Requests\TransactionRequest;
 use App\Models\Account;
 use App\Models\Attachment;
 use App\Models\Category;
+use App\Models\Debt;
 use App\Models\Tag;
 use App\Models\Transaction;
+use App\Services\Debt\DebtPaymentManager;
 use App\Services\Transactions\TransactionManager;
 use App\Support\Money;
+use App\Support\Workspace\ActiveWorkspace;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -27,7 +30,10 @@ class TransactionController extends Controller
 {
     use AuthorizesWorkspaceData;
 
-    public function __construct(private readonly TransactionManager $transactions) {}
+    public function __construct(
+        private readonly TransactionManager $transactions,
+        private readonly DebtPaymentManager $debtPayments,
+    ) {}
 
     /**
      * Daftar transaksi + filter (PRD.md §3.3).
@@ -83,6 +89,8 @@ class TransactionController extends Controller
                 'tags:id,workspace_id,name',
                 'attachments:id,workspace_id,transaction_id,original_name,mime_type,size',
                 'adminFee:id,workspace_id,parent_transaction_id,amount,category_id',
+                'debtPayment:id,workspace_id,debt_id,transaction_id,amount,paid_at',
+                'debtPayment.debt:id,workspace_id,counterparty',
             ])
             ->paginate($request->perPage())
             ->withQueryString();
@@ -103,11 +111,7 @@ class TransactionController extends Controller
                 'search' => $filters['search'],
             ],
             'summary' => $this->summary($filters),
-            'options' => [
-                'accounts' => $this->accountOptions(),
-                'categories' => $this->categoryOptions(),
-                'tags' => $this->tagOptions(),
-            ],
+            'options' => $this->formOptions(),
         ]);
     }
 
@@ -116,11 +120,7 @@ class TransactionController extends Controller
         $this->authorizeViewData();
 
         return Inertia::render('transactions/Create', [
-            'options' => [
-                'accounts' => $this->accountOptions(),
-                'categories' => $this->categoryOptions(),
-                'tags' => $this->tagOptions(),
-            ],
+            'options' => $this->formOptions(),
         ]);
     }
 
@@ -135,6 +135,7 @@ class TransactionController extends Controller
             $request->file('attachment'),
             $request->adminFeeCents(),
             $request->adminFeeCategoryId(),
+            $request->debtId(),
         );
 
         Inertia::flash('toast', [
@@ -149,27 +150,26 @@ class TransactionController extends Controller
     {
         $this->authorizeViewData();
 
+        // `present()` membaca beberapa relasi; dimuat eksplisit supaya form edit
+        // tidak memicu query tambahan. `category.parent` menambah satu query
+        // supaya select kategori utama/sub terisi benar saat transaksi yang
+        // disimpan memakai sub-kategori.
+        $transaction->load([
+            'account',
+            'transferToAccount',
+            'category',
+            'category.parent',
+            'tags',
+            'attachments',
+            'adminFee',
+            'debtPayment.debt',
+        ]);
+
         return Inertia::render('transactions/Edit', [
-            // `present()` membaca lima relasi; dimuat eksplisit supaya form edit
-            // tidak memicu lima query tambahan. `category.parent` menambah
-            // satu query supaya select kategori utama/sub terisi benar saat
-            // transaksi yang disimpan memakai sub-kategori.
-            'transaction' => $this->present(
-                $transaction->load([
-                    'account',
-                    'transferToAccount',
-                    'category',
-                    'category.parent',
-                    'tags',
-                    'attachments',
-                    'adminFee',
-                ]),
-            ),
-            'options' => [
-                'accounts' => $this->accountOptions(),
-                'categories' => $this->categoryOptions(),
-                'tags' => $this->tagOptions(),
-            ],
+            'transaction' => $this->present($transaction),
+            // Utang yang sudah tertaut ikut dikirim sebagai opsi walau sudah
+            // lunas, supaya form edit menampilkannya dan bisa dilepas.
+            'options' => $this->formOptions($transaction->debtPayment?->debt),
         ]);
     }
 
@@ -186,6 +186,7 @@ class TransactionController extends Controller
             $request->shouldRemoveAttachment(),
             $request->adminFeeCents(),
             $request->adminFeeCategoryId(),
+            $request->debtId(),
         );
 
         Inertia::flash('toast', [
@@ -406,6 +407,40 @@ class TransactionController extends Controller
     }
 
     /**
+     * Opsi master data untuk form transaksi: akun, kategori, tag, dan daftar
+     * utang yang harus dibayar.
+     *
+     * Utang ikut dikirim karena select "Bayar utang" hanya perlu menampilkan
+     * utang yang masih punya sisa — bukan seluruh riwayat utang yang sudah
+     * lunas.
+     *
+     * @return array{accounts: array<int, mixed>, categories: array<int, mixed>, tags: array<int, mixed>, debts: array<int, mixed>}
+     */
+    private function formOptions(?Debt $linkedDebt = null): array
+    {
+        return [
+            'accounts' => $this->accountOptions(),
+            'categories' => $this->categoryOptions(),
+            'tags' => $this->tagOptions(),
+            'debts' => $this->debtOptions($linkedDebt),
+        ];
+    }
+
+    /**
+     * Utang yang harus dibayar, untuk select "Bayar utang".
+     *
+     * @return array<int, array{id: int, counterparty: string, remaining: string, due_date: string|null, status_label: string}>
+     */
+    private function debtOptions(?Debt $linkedDebt = null): array
+    {
+        $workspace = ActiveWorkspace::workspace();
+
+        abort_if($workspace === null, 403);
+
+        return $this->debtPayments->payableOptions($workspace->id, $linkedDebt)->all();
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function tagOptions(): array
@@ -444,6 +479,8 @@ class TransactionController extends Controller
      */
     private function present(Transaction $transaction): array
     {
+        $payment = $transaction->debtPayment;
+
         return [
             'id' => $transaction->id,
             'type' => $transaction->type->value,
@@ -487,6 +524,11 @@ class TransactionController extends Controller
             'admin_fee' => $transaction->adminFee?->amount,
             'admin_fee_category_id' => $transaction->adminFee?->category_id,
             'is_admin_fee' => $transaction->isAdminFee(),
+            // Utang yang dilunasi expense ini, untuk mengisi select "Bayar
+            // utang" di form edit dan badge di daftar.
+            'debt_id' => $payment?->debt_id,
+            'debt' => $payment?->debt?->only(['id', 'counterparty']),
+            'is_debt_payment' => $payment !== null,
         ];
     }
 

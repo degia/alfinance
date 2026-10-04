@@ -5,6 +5,7 @@ namespace App\Listeners;
 use App\Events\AccountUpdated;
 use App\Events\BudgetUpdated;
 use App\Events\DebtPaymentRecorded;
+use App\Events\DebtPaymentRemoved;
 use App\Events\TransactionDeleted;
 use App\Events\TransactionSaved;
 use App\Jobs\RecomputeDashboardSnapshotJob;
@@ -56,6 +57,13 @@ class ScheduleAggregateRecompute
     public function handleDebtPaymentRecorded(DebtPaymentRecorded $event): void
     {
         $this->queue($event->workspaceId(), $event->month());
+    }
+
+    public function handleDebtPaymentRemoved(DebtPaymentRemoved $event): void
+    {
+        // Bulan bulan lalu sudah final, jadi cukup bulan berjalan yang dihitung
+        // ulang; snapshot lama tidak ditulis ulang oleh job terjadwal.
+        $this->queue($event->workspaceId(), CarbonImmutable::now()->format('Y-m'));
     }
 
     private function queue(int $workspaceId, string $month): void

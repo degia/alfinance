@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\DebtPaymentRecorded;
+use App\Events\DebtPaymentRemoved;
 use App\Events\NetWorthItemSaved;
 use App\Jobs\GenerateNetWorthSnapshotJob;
 use Carbon\CarbonImmutable;
@@ -22,6 +23,13 @@ class RefreshNetWorthSnapshot
 {
     public function handlePayment(DebtPaymentRecorded $event): void
     {
+        $this->snapshotFor($event->workspaceId());
+    }
+
+    public function handlePaymentRemoved(DebtPaymentRemoved $event): void
+    {
+        // Sisa utang kembali naik setelah cicilan dicabut, jadi tren net worth
+        // bulan berjalan harus menyusul juga.
         $this->snapshotFor($event->workspaceId());
     }
 

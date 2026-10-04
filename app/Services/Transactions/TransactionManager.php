@@ -9,6 +9,7 @@ use App\Models\Account;
 use App\Models\Attachment;
 use App\Models\RecurringRule;
 use App\Models\Transaction;
+use App\Services\Debt\DebtPaymentManager;
 use App\Support\Money;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -35,13 +36,17 @@ use RuntimeException;
  */
 class TransactionManager
 {
-    public function __construct(private readonly AdminFeeManager $adminFees) {}
+    public function __construct(
+        private readonly AdminFeeManager $adminFees,
+        private readonly DebtPaymentManager $debtPayments,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $attributes
      * @param  array<int, int>  $tagIds
      * @param  int|null  $adminFee  potongan admin dalam sen; hanya berlaku untuk transfer
      * @param  int|null  $adminFeeCategoryId  kategori baris potongan admin; null = kategori otomatis
+     * @param  int|null  $debtId  utang yang dilunasi expense ini; null = expense biasa
      */
     public function create(
         array $attributes,
@@ -50,8 +55,11 @@ class TransactionManager
         ?UploadedFile $attachment = null,
         ?int $adminFee = null,
         ?int $adminFeeCategoryId = null,
+        ?int $debtId = null,
     ): Transaction {
-        $transaction = DB::transaction(function () use ($attributes, $actorId, $tagIds, $attachment, $adminFee, $adminFeeCategoryId): Transaction {
+        $debtPayment = null;
+
+        $transaction = DB::transaction(function () use ($attributes, $actorId, $tagIds, $attachment, $adminFee, $adminFeeCategoryId, $debtId, &$debtPayment): Transaction {
             $transaction = new Transaction($attributes);
             $transaction->created_by = $actorId;
             $transaction->updated_by = $actorId;
@@ -69,6 +77,10 @@ class TransactionManager
                 $transaction->workspace_id,
             );
 
+            // Expense yang dipilih sebagai "Bayar utang" ikut dicatat di riwayat
+            // cicilan, jadi `debts.remaining` turun di DB transaction yang sama.
+            $debtPayment = $this->debtPayments->sync($transaction, $debtId, $actorId);
+
             if ($attachment !== null) {
                 $this->storeAttachment($transaction, $attachment);
             }
@@ -78,6 +90,7 @@ class TransactionManager
 
         TransactionSaved::dispatch($transaction, created: true);
         $this->dispatchAdminFeeSaved($transaction);
+        $this->debtPayments->announce(null, $debtPayment, $actorId);
 
         return $transaction;
     }
@@ -94,6 +107,7 @@ class TransactionManager
      * @param  array<int, int>|null  $tagIds  null = jangan sentuh tag
      * @param  int|null  $adminFee  potongan admin dalam sen; null = tanpa potongan admin
      * @param  int|null  $adminFeeCategoryId  kategori baris potongan admin; null = kategori otomatis
+     * @param  int|null  $debtId  utang yang dilunasi expense ini; null = bukan pembayaran utang
      */
     public function update(
         Transaction $transaction,
@@ -104,15 +118,19 @@ class TransactionManager
         bool $removeAttachment = false,
         ?int $adminFee = null,
         ?int $adminFeeCategoryId = null,
+        ?int $debtId = null,
     ): Transaction {
         $previousFee = $this->adminFees->find($transaction);
+        $previousDebtPayment = $this->debtPayments->find($transaction);
         $previousDeltas = $this->mergeDeltas(
             $transaction->reversedBalanceDeltas(),
             $this->adminFees->reversedDeltas($previousFee),
         );
         $previousMonth = $transaction->occurred_at->format('Y-m');
 
-        $updated = DB::transaction(function () use ($transaction, $attributes, $actorId, $tagIds, $attachment, $removeAttachment, $adminFee, $adminFeeCategoryId, $previousDeltas): Transaction {
+        $debtPayment = null;
+
+        $updated = DB::transaction(function () use ($transaction, $attributes, $actorId, $tagIds, $attachment, $removeAttachment, $adminFee, $adminFeeCategoryId, $debtId, $previousDeltas, &$debtPayment): Transaction {
             $transaction->fill($attributes);
             $transaction->updated_by = $actorId;
             $transaction->save();
@@ -122,6 +140,10 @@ class TransactionManager
             }
 
             $fee = $this->syncAdminFee($transaction, $adminFee, $actorId, $adminFeeCategoryId);
+
+            // Nominal atau tanggal yang dikoreksi ikut menyesuaikan cicilannya;
+            // tautan yang dilepas mengembalikan sisa utang lama.
+            $debtPayment = $this->debtPayments->sync($transaction, $debtId, $actorId);
 
             $this->applyDeltas(
                 $this->mergeDeltas(
@@ -159,6 +181,8 @@ class TransactionManager
             TransactionDeleted::dispatch($previousFee);
         }
 
+        $this->debtPayments->announce($previousDebtPayment, $debtPayment, $actorId);
+
         return $updated;
     }
 
@@ -173,11 +197,17 @@ class TransactionManager
             $this->adminFees->reversedDeltas($fee),
         );
 
-        DB::transaction(function () use ($transaction, $fee, $deltas): void {
+        $debtPayment = null;
+
+        DB::transaction(function () use ($transaction, $fee, $deltas, &$debtPayment): void {
             $this->applyDeltas($deltas, $transaction->workspace_id);
             $this->deleteAttachments($transaction);
             $transaction->tags()->detach();
             $fee?->delete();
+            // Cicilan utang harus ikut hilang: `debt_payments.transaction_id`
+            // memakai `nullOnDelete`, jadi barisnya akan menggantung dan tetap
+            // memotong sisa utang kalau tidak dihapus di sini.
+            $debtPayment = $this->debtPayments->unlink($transaction);
             $transaction->delete();
         });
 
@@ -186,6 +216,8 @@ class TransactionManager
         if ($fee !== null) {
             TransactionDeleted::dispatch($fee);
         }
+
+        $this->debtPayments->announceRemoved($debtPayment);
     }
 
     /**
@@ -235,11 +267,13 @@ class TransactionManager
         // Deltas transaksi pending selalu kosong, jadi tidak ada saldo yang perlu
         // dibalik; cukup hapus lampiran, baris biaya admin, dan barisnya.
         $fee = $this->adminFees->find($transaction);
+        $debtPayment = null;
 
-        DB::transaction(function () use ($transaction, $fee): void {
+        DB::transaction(function () use ($transaction, $fee, &$debtPayment): void {
             $this->deleteAttachments($transaction);
             $transaction->tags()->detach();
             $fee?->delete();
+            $debtPayment = $this->debtPayments->unlink($transaction);
             $transaction->delete();
         });
 
@@ -248,6 +282,8 @@ class TransactionManager
         if ($fee !== null) {
             TransactionDeleted::dispatch($fee);
         }
+
+        $this->debtPayments->announceRemoved($debtPayment);
     }
 
     /**

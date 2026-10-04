@@ -38,6 +38,7 @@ class DebtService
 {
     public function __construct(
         private readonly TransactionManager $transactions,
+        private readonly DebtBalanceCalculator $balances,
     ) {}
 
     /**
@@ -167,21 +168,13 @@ class DebtService
     /**
      * Hitung ulang `remaining` & `status` dari riwayat pembayaran.
      *
-     * Sisa tidak pernah negatif: pembayaran yang melebihi pokok dipotong ke nol
-     * dan status menjadi `settled`.
+     * Perhitungan nominalnya ada di {@see DebtBalanceCalculator} supaya write
+     * path dari modul Transaksi ("Bayar utang") memakai rumus yang sama —
+     * sisa utang adalah invariant yang tidak boleh ditulis dari dua tempat.
      */
     public function recalculate(Debt $debt): Debt
     {
-        // `SUM(amount)` mengembalikan satuan rupiah sebagai string desimal
-        // ("1000000.00"), BUKAN integer sen — cast `(int)` akan memotong dua
-        // desimalnya dan membuat sisa utang 100x terlalu besar.
-        $paid = Money::fromDatabaseSum($this->paymentQuery($debt)->sum('amount'));
-
-        $debt->remaining = Money::atLeastZero(Money::subtract($debt->principal, $paid));
-        $debt->status = $debt->currentStatus();
-        $debt->save();
-
-        return $debt;
+        return $this->balances->recalculate($debt);
     }
 
     /**
@@ -224,12 +217,19 @@ class DebtService
             ->withCount('payments')
             ->get()
             ->filter(fn (Debt $debt): bool => $debt->currentStatus($today) === $status)
-            ->sortBy([
+            ->sort(function (Debt $a, Debt $b): int {
                 // Utang tanpa jatuh tempo di urut paling akhir.
-                fn (Debt $debt): int => $debt->due_date === null ? 1 : 0,
-                fn (Debt $debt): string => $debt->due_date?->toDateString() ?? '9999-12-31',
-                fn (Debt $debt): string => $debt->counterparty,
-            ])
+                $withoutDueDate = (int) ($a->due_date === null) <=> (int) ($b->due_date === null);
+
+                if ($withoutDueDate !== 0) {
+                    return $withoutDueDate;
+                }
+
+                $due = ($a->due_date?->toDateString() ?? '9999-12-31')
+                    <=> ($b->due_date?->toDateString() ?? '9999-12-31');
+
+                return $due !== 0 ? $due : strcasecmp($a->counterparty, $b->counterparty);
+            })
             ->values();
     }
 

@@ -17,6 +17,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { formatCurrency, formatDate } from '@/lib/format';
 import type {
     TransactionFormData,
     TransactionListItem,
@@ -65,6 +66,7 @@ const emptyForm = (): TransactionFormData => ({
     amount: '',
     admin_fee: '',
     admin_fee_category_id: '',
+    debt_id: '',
     occurred_at: today(),
     note: '',
     tag_ids: [],
@@ -83,6 +85,46 @@ const selectedFile = ref<File | null>(null);
 const localAttachments = ref<TransactionListItem['attachments']>([]);
 
 const isTransfer = computed(() => form.type === 'transfer');
+
+const isExpense = computed(() => form.type === 'expense');
+
+/**
+ * Utang yang harus dibayar. Didaftarkan server lewat `options.debts` dan sudah
+ * disaring: hanya utang milik workspace aktif yang belum lunas, diurutkan
+ * terlambat lalu jatuh tempo terdekat.
+ */
+const payableDebts = computed(() => props.options.debts);
+
+const selectedDebt = computed(
+    () =>
+        payableDebts.value.find(
+            (debt) => debt.id === form.debt_id,
+        ) ?? null,
+);
+
+/**
+ * Nominal yang terisi otomatis oleh select "Bayar utang", dipakai untuk
+ * membedakan "nominal hasil pilihan user" dari "nominal yang kita isi sendiri":
+ * memilih utang lain tidak boleh menimpa nominal yang sudah diketik user.
+ */
+const autoFilledAmount = ref<string | null>(null);
+
+watch(
+    () => form.debt_id,
+    () => {
+        const amountIsStillOurs =
+            form.amount === '' || form.amount === autoFilledAmount.value;
+
+        if (selectedDebt.value === null || !amountIsStillOurs) {
+            return;
+        }
+
+        // Default-nya melunasi sisa utang, tapi nominal tetap bisa dikoreksi
+        // untuk cicilan sebagian.
+        autoFilledAmount.value = selectedDebt.value.remaining;
+        form.amount = selectedDebt.value.remaining;
+    },
+);
 
 /**
  * Kategori untuk baris potongan admin ditampilkan datar: kategori utama dulu
@@ -155,6 +197,7 @@ function hydrate(transaction: TransactionListItem): void {
         amount: transaction.amount,
         admin_fee: transaction.admin_fee ?? '',
         admin_fee_category_id: transaction.admin_fee_category_id ?? '',
+        debt_id: transaction.debt_id ?? '',
         occurred_at: transaction.occurred_at,
         note: transaction.note ?? '',
         tag_ids: [...transaction.tag_ids],
@@ -180,11 +223,22 @@ if (props.transaction) {
  * server memakai aturan `prohibited`/`required`, jadi field yang sekadar
  * disembunyikan akan ditolak.
  */
+/**
+ * "Bayar utang" hanya berlaku untuk expense; income dan transfer harus benar
+ * benar mengosongkan field ini karena server menolaknya dengan `prohibited`.
+ */
+watch(isExpense, (expense) => {
+    if (!expense) {
+        form.debt_id = '';
+    }
+});
+
 watch(isTransfer, (transfer) => {
     if (transfer) {
         selectedRootId.value = '';
         selectedChildId.value = '';
         form.category_id = '';
+        form.debt_id = '';
     } else {
         form.transfer_to_account_id = '';
         form.admin_fee = '';
@@ -382,6 +436,58 @@ function submit(): void {
                             <p class="text-xs text-muted-foreground">
                                 Kosongkan untuk memakai kategori utama langsung.
                             </p>
+                        </div>
+
+                        <!--
+                            Bayar utang: expense ini dicatat sebagai cicilan
+                            utangnya, jadi sisa utang di menu Utang & Piutang
+                            ikut turun. Hanya expense yang punya utang.
+                        -->
+                        <div
+                            v-if="isExpense"
+                            class="grid gap-2 border-t border-border pt-4"
+                        >
+                            <Label for="transaction-debt">Bayar utang</Label>
+                            <Select v-model="form.debt_id">
+                                <SelectTrigger
+                                    id="transaction-debt"
+                                    class="w-full shadow-neu-inset"
+                                    :aria-invalid="Boolean(form.errors.debt_id)"
+                                >
+                                    <SelectValue placeholder="Bukan pembayaran utang" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="debt in payableDebts"
+                                        :key="debt.id"
+                                        :value="debt.id"
+                                    >
+                                        {{ debt.counterparty }} —
+                                        {{ formatCurrency(debt.remaining) }}
+                                        <span
+                                            v-if="debt.due_date"
+                                            class="text-xs text-muted-foreground"
+                                        >
+                                            (jatuh tempo
+                                            {{ formatDate(debt.due_date) }})
+                                        </span>
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p class="text-xs text-muted-foreground">
+                                <template v-if="selectedDebt">
+                                    Sisa {{ selectedDebt.counterparty }}:
+                                    {{ formatCurrency(selectedDebt.remaining) }}
+                                    — {{ selectedDebt.status_label }}. Nominal
+                                    terisi penuh; perkecil untuk cicilan
+                                    sebagian.
+                                </template>
+                                <template v-else>
+                                    Kosongkan kalau pengeluaran ini bukan
+                                    pelunasan utang.
+                                </template>
+                            </p>
+                            <InputError :message="form.errors.debt_id" />
                         </div>
                     </div>
 

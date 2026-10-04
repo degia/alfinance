@@ -78,9 +78,15 @@ class DashboardAggregator
         }
 
         return DB::transaction(function () use ($workspaceId, $month, $income, $expense, $transfer, $count): DashboardSnapshot {
+            // `whereYear` + `whereMonth`, bukan `where('month', ...)`: kolom
+            // DATE di SQLite menyimpan komponen waktu (`2026-09-01 00:00:00`)
+            // sedangkan MySQL memangkas jadi `2026-09-01`. Tanpa ini, hitung
+            // ulang bulan yang sudah punya baris tidak menemukan baris lama,
+            // lalu menabrak unique index — jadi agregatnya tidak idempoten.
             $snapshot = DashboardSnapshot::allWorkspaces()
                 ->where('workspace_id', $workspaceId)
-                ->where('month', $month->toDateString())
+                ->whereYear('month', $month->year)
+                ->whereMonth('month', $month->month)
                 ->lockForUpdate()
                 ->first();
 

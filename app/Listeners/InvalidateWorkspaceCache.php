@@ -5,6 +5,7 @@ namespace App\Listeners;
 use App\Events\AccountUpdated;
 use App\Events\BudgetUpdated;
 use App\Events\DebtPaymentRecorded;
+use App\Events\DebtPaymentRemoved;
 use App\Events\TransactionDeleted;
 use App\Events\TransactionSaved;
 use App\Services\Cache\WorkspaceCache;
@@ -48,6 +49,11 @@ class InvalidateWorkspaceCache
     }
 
     public function handleDebtPaymentRecorded(DebtPaymentRecorded $event): void
+    {
+        $this->flush($event->workspaceId());
+    }
+
+    public function handleDebtPaymentRemoved(DebtPaymentRemoved $event): void
     {
         $this->flush($event->workspaceId());
     }
