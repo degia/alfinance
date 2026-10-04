@@ -41,6 +41,7 @@ class TransactionManager
      * @param  array<string, mixed>  $attributes
      * @param  array<int, int>  $tagIds
      * @param  int|null  $adminFee  potongan admin dalam sen; hanya berlaku untuk transfer
+     * @param  int|null  $adminFeeCategoryId  kategori baris potongan admin; null = kategori otomatis
      */
     public function create(
         array $attributes,
@@ -48,8 +49,9 @@ class TransactionManager
         array $tagIds = [],
         ?UploadedFile $attachment = null,
         ?int $adminFee = null,
+        ?int $adminFeeCategoryId = null,
     ): Transaction {
-        $transaction = DB::transaction(function () use ($attributes, $actorId, $tagIds, $attachment, $adminFee): Transaction {
+        $transaction = DB::transaction(function () use ($attributes, $actorId, $tagIds, $attachment, $adminFee, $adminFeeCategoryId): Transaction {
             $transaction = new Transaction($attributes);
             $transaction->created_by = $actorId;
             $transaction->updated_by = $actorId;
@@ -60,7 +62,7 @@ class TransactionManager
             // Potongan admin dicatat sebagai baris expense terpisah, tapi
             // dampaknya digabung ke peta delta yang sama supaya akun yang sama
             // tidak ditulis dua kali.
-            $fee = $this->syncAdminFee($transaction, $adminFee, $actorId);
+            $fee = $this->syncAdminFee($transaction, $adminFee, $actorId, $adminFeeCategoryId);
 
             $this->applyDeltas(
                 $this->mergeDeltas($transaction->balanceDeltas(), $fee?->balanceDeltas() ?? []),
@@ -91,6 +93,7 @@ class TransactionManager
      * @param  array<string, mixed>  $attributes
      * @param  array<int, int>|null  $tagIds  null = jangan sentuh tag
      * @param  int|null  $adminFee  potongan admin dalam sen; null = tanpa potongan admin
+     * @param  int|null  $adminFeeCategoryId  kategori baris potongan admin; null = kategori otomatis
      */
     public function update(
         Transaction $transaction,
@@ -100,6 +103,7 @@ class TransactionManager
         ?UploadedFile $attachment = null,
         bool $removeAttachment = false,
         ?int $adminFee = null,
+        ?int $adminFeeCategoryId = null,
     ): Transaction {
         $previousFee = $this->adminFees->find($transaction);
         $previousDeltas = $this->mergeDeltas(
@@ -108,7 +112,7 @@ class TransactionManager
         );
         $previousMonth = $transaction->occurred_at->format('Y-m');
 
-        $updated = DB::transaction(function () use ($transaction, $attributes, $actorId, $tagIds, $attachment, $removeAttachment, $adminFee, $previousDeltas): Transaction {
+        $updated = DB::transaction(function () use ($transaction, $attributes, $actorId, $tagIds, $attachment, $removeAttachment, $adminFee, $adminFeeCategoryId, $previousDeltas): Transaction {
             $transaction->fill($attributes);
             $transaction->updated_by = $actorId;
             $transaction->save();
@@ -117,7 +121,7 @@ class TransactionManager
                 $this->syncTags($transaction, $tagIds);
             }
 
-            $fee = $this->syncAdminFee($transaction, $adminFee, $actorId);
+            $fee = $this->syncAdminFee($transaction, $adminFee, $actorId, $adminFeeCategoryId);
 
             $this->applyDeltas(
                 $this->mergeDeltas(
@@ -277,14 +281,21 @@ class TransactionManager
      *
      * Hanya transfer yang boleh punya potongan admin; untuk tipe lain
      * `AdminFeeManager` diberi 0 supaya baris yang tadinya ada ikut terhapus
-     * (mis. user mengubah transfer menjadi expense biasa).
+     * (mis. user mengubah transfer menjadi expense biasa). Kategori yang
+     * dipilih ikut diabaikan untuk tipe non-transfer, jadi tidak ada kategori
+     * nyasar yang tersimpan di form income/expense.
      */
-    private function syncAdminFee(Transaction $transaction, ?int $adminFee, ?int $actorId): ?Transaction
-    {
+    private function syncAdminFee(
+        Transaction $transaction,
+        ?int $adminFee,
+        ?int $actorId,
+        ?int $categoryId = null,
+    ): ?Transaction {
         return $this->adminFees->sync(
             $transaction,
             $transaction->isTransfer() ? $adminFee : 0,
             $actorId,
+            $transaction->isTransfer() ? $categoryId : null,
         );
     }
 

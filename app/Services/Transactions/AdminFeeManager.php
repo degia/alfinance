@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Potongan admin sebuah transfer dicatat sebagai transaksi `expense` biasa
- * pada akun sumber, dengan kategori "Biaya Admin".
+ * pada akun sumber, dengan kategori "Biaya Admin" — atau kategori lain kalau
+ * user memilih sendiri di form transfer.
  *
  * Alasan begini: biaya admin bukan bagian dari nominal transfer — uang berpindah
  * penuh dari akun sumber ke akun tujuan, lalu biaya admin keluar sebagai
@@ -52,10 +53,18 @@ class AdminFeeManager
      * baris yang sudah ada dihapus. Baris turunan tidak pernah punya lampiran
      * maupun tag, jadi tidak ada file yang perlu dibersihkan di sini.
      *
+     * `$categoryId` opsional: kalau diisi, kategori itulah yang dipakai untuk
+     * baris biayanya (user sudah memilih sendiri, misalnya "Fee Transfer BCA"),
+     * kalau tidak, kategori otomatis {@see CATEGORY_NAME} yang dipakai.
+     *
      * @return Transaction|null baris biaya setelah sinkron, null kalau tidak ada
      */
-    public function sync(Transaction $transfer, ?int $amount, ?int $actorId = null): ?Transaction
-    {
+    public function sync(
+        Transaction $transfer,
+        ?int $amount,
+        ?int $actorId = null,
+        ?int $categoryId = null,
+    ): ?Transaction {
         $fee = $this->find($transfer);
 
         if ($amount === null || $amount === 0) {
@@ -66,7 +75,7 @@ class AdminFeeManager
 
         $attributes = [
             'account_id' => $transfer->account_id,
-            'category_id' => $this->categoryFor((int) $transfer->workspace_id)->id,
+            'category_id' => $this->resolveCategory((int) $transfer->workspace_id, $categoryId)->id,
             'transfer_to_account_id' => null,
             'recurring_rule_id' => null,
             'type' => TransactionType::Expense,
@@ -139,6 +148,32 @@ class AdminFeeManager
         return Transaction::allWorkspaces()
             ->where('workspace_id', $transfer->workspace_id)
             ->where('parent_transaction_id', $transfer->id);
+    }
+
+    /**
+     * Kategori untuk baris potongan admin: kategori yang dipilih user kalau ada,
+     * selain itu kategori "Biaya Admin" yang dibuat otomatis.
+     *
+     * Kategori yang dipilih user diverifikasi ulang di sini (bukan cuma di
+     * request) supaya manager ini tetap aman kalau someday dipanggil dari
+     * scheduled job atau importer yang tidak lewat validasi FormRequest.
+     * Kategori yang tidak ada di workspace transaksi diabaikan dan jatuh ke
+     * kategori otomatis — baris biaya tidak boleh gagal ditulis hanya karena
+     * kategori alien.
+     */
+    private function resolveCategory(int $workspaceId, ?int $categoryId): Category
+    {
+        if ($categoryId === null) {
+            return $this->categoryFor($workspaceId);
+        }
+
+        /** @var Category|null $category */
+        $category = Category::allWorkspaces()
+            ->where('workspace_id', $workspaceId)
+            ->whereKey($categoryId)
+            ->first();
+
+        return $category ?? $this->categoryFor($workspaceId);
     }
 
     /**

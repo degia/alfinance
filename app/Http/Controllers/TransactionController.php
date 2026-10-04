@@ -82,7 +82,7 @@ class TransactionController extends Controller
                 'category.parent:id,parent_id,name',
                 'tags:id,workspace_id,name',
                 'attachments:id,workspace_id,transaction_id,original_name,mime_type,size',
-                'adminFee:id,workspace_id,parent_transaction_id,amount',
+                'adminFee:id,workspace_id,parent_transaction_id,amount,category_id',
             ])
             ->paginate($request->perPage())
             ->withQueryString();
@@ -134,6 +134,7 @@ class TransactionController extends Controller
             $request->tagIds(),
             $request->file('attachment'),
             $request->adminFeeCents(),
+            $request->adminFeeCategoryId(),
         );
 
         Inertia::flash('toast', [
@@ -184,6 +185,7 @@ class TransactionController extends Controller
             $request->file('attachment'),
             $request->shouldRemoveAttachment(),
             $request->adminFeeCents(),
+            $request->adminFeeCategoryId(),
         );
 
         Inertia::flash('toast', [
@@ -483,6 +485,7 @@ class TransactionController extends Controller
             // penanda baris yang memang hasil potongan admin (untuk badge di
             // daftar). Keduanya sudah ter-eager-load, jadi tidak menambah query.
             'admin_fee' => $transaction->adminFee?->amount,
+            'admin_fee_category_id' => $transaction->adminFee?->category_id,
             'is_admin_fee' => $transaction->isAdminFee(),
         ];
     }

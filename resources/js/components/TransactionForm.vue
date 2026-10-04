@@ -64,6 +64,7 @@ const emptyForm = (): TransactionFormData => ({
     type: 'expense',
     amount: '',
     admin_fee: '',
+    admin_fee_category_id: '',
     occurred_at: today(),
     note: '',
     tag_ids: [],
@@ -82,6 +83,23 @@ const selectedFile = ref<File | null>(null);
 const localAttachments = ref<TransactionListItem['attachments']>([]);
 
 const isTransfer = computed(() => form.type === 'transfer');
+
+/**
+ * Kategori untuk baris potongan admin ditampilkan datar: kategori utama dulu
+ * lalu sub-kategorinya, dengan sub-kategori diberi indent supaya tetap jelas
+ * induknya. Select ini sengaja terpisah dari select kategori transaksi, karena
+ * yang dikategorikan di sini adalah pengeluaran "Potongan admin", bukan transfer
+ * yang dicatat dari akun sumber ke akun tujuan.
+ */
+const adminFeeCategories = computed(() =>
+    props.options.categories.map((category) => ({
+        id: category.id,
+        name:
+            category.parent_id === null
+                ? category.name
+                : `\u2014 ${category.name}`,
+    })),
+);
 
 /**
  * Kategori utama dan sub-kategori dipisah supaya form bisa menampilkan dua
@@ -136,6 +154,7 @@ function hydrate(transaction: TransactionListItem): void {
         type: transaction.type,
         amount: transaction.amount,
         admin_fee: transaction.admin_fee ?? '',
+        admin_fee_category_id: transaction.admin_fee_category_id ?? '',
         occurred_at: transaction.occurred_at,
         note: transaction.note ?? '',
         tag_ids: [...transaction.tag_ids],
@@ -169,6 +188,7 @@ watch(isTransfer, (transfer) => {
     } else {
         form.transfer_to_account_id = '';
         form.admin_fee = '';
+        form.admin_fee_category_id = '';
     }
 });
 
@@ -387,8 +407,9 @@ function submit(): void {
 
                 <!--
                     Potongan admin hanya ada di transfer: nilainya dicatat sebagai
-                    pengeluaran terpisah kategori "Biaya Admin" di akun sumber,
-                    bukan dipotong dari nominal yang sampai ke akun tujuan.
+                    pengeluaran terpisah di akun sumber, bukan dipotong dari nominal
+                    yang sampai ke akun tujuan. Kategorinya boleh dipilih sendiri;
+                    kalau dikosongkan server memakai kategori otomatis "Biaya Admin".
                 -->
                 <div v-if="isTransfer" class="grid gap-4 md:grid-cols-2">
                     <div class="grid gap-2">
@@ -406,10 +427,43 @@ function submit(): void {
                             :aria-invalid="Boolean(form.errors.admin_fee)"
                         />
                         <p class="text-xs text-muted-foreground">
-                            Opsional — dicatat sebagai pengeluaran "Biaya
-                            Admin" dari akun sumber.
+                            Opsional — dicatat sebagai pengeluaran terpisah dari
+                            akun sumber.
                         </p>
                         <InputError :message="form.errors.admin_fee" />
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label for="transaction-admin-fee-category">
+                            Kategori biaya admin
+                        </Label>
+                        <Select v-model="form.admin_fee_category_id">
+                            <SelectTrigger
+                                id="transaction-admin-fee-category"
+                                class="w-full shadow-neu-inset"
+                                :aria-invalid="
+                                    Boolean(form.errors.admin_fee_category_id)
+                                "
+                            >
+                                <SelectValue placeholder="Biaya Admin (otomatis)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="category in adminFeeCategories"
+                                    :key="category.id"
+                                    :value="category.id"
+                                >
+                                    {{ category.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p class="text-xs text-muted-foreground">
+                            Kosongkan untuk memakai kategori otomatis "Biaya
+                            Admin".
+                        </p>
+                        <InputError
+                            :message="form.errors.admin_fee_category_id"
+                        />
                     </div>
                 </div>
 

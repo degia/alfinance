@@ -76,6 +76,12 @@ export type TransactionListItem = {
      * Dipakai form edit untuk mengisi ulang field potongan admin.
      */
     admin_fee: string | null;
+    /**
+     * Kategori baris potongan admin milik transfer ini, untuk mengisi ulang
+     * select kategori di form edit. `null` berarti memakai kategori otomatis
+     * "Biaya Admin".
+     */
+    admin_fee_category_id: number | null;
     /** Baris ini adalah pengeluaran "Biaya Admin" hasil dari sebuah transfer. */
     is_admin_fee: boolean;
 };
@@ -138,6 +144,11 @@ export type TransactionFormData = {
      * Hanya dikirim untuk tipe `transfer`; server menolaknya untuk tipe lain.
      */
     admin_fee: string;
+    /**
+     * Kategori untuk baris potongan admin. `''` berarti pakai kategori otomatis
+     * "Biaya Admin", jadi tidak wajib diisi.
+     */
+    admin_fee_category_id: number | '';
     occurred_at: string;
     note: string;
     tag_ids: number[];

@@ -21,7 +21,8 @@ use Illuminate\Validation\Rule;
  *
  * `admin_fee` (potongan admin) juga hanya berlaku untuk transfer: nilainya tidak
  * disimpan di baris transfer, tapi dicatat sebagai baris `expense` terpisah
- * (lihat {@see AdminFeeManager}).
+ * (lihat {@see AdminFeeManager}). `admin_fee_category_id`.opsional mengikuti
+ * baris itu — kosong berarti pakai kategori otomatis "Biaya Admin".
  */
 class TransactionRequest extends FormRequest
 {
@@ -101,6 +102,16 @@ class TransactionRequest extends FormRequest
                 'max:99999999999',
             ],
 
+            // Kategori untuk baris potongan admin. Opsional: kalau dikosongkan,
+            // `AdminFeeManager` memakai/membuat kategori "Biaya Admin". Tetap
+            // `nullable` di cabang `prohibited` dengan alasan yang sama seperti
+            // `category_id`: form mengirim string kosong yang jadi `null`.
+            'admin_fee_category_id' => [
+                'nullable',
+                ...($isTransfer ? [] : ['prohibited']),
+                Rule::exists('categories', 'id')->where('workspace_id', $workspaceId),
+            ],
+
             'attachment' => [
                 'nullable',
                 'file',
@@ -138,6 +149,8 @@ class TransactionRequest extends FormRequest
             'admin_fee.decimal' => __('Potongan admin maksimal dua angka desimal.'),
             'admin_fee.min' => __('Potongan admin harus lebih besar dari nol.'),
             'admin_fee.max' => __('Potongan admin terlalu besar.'),
+            'admin_fee_category_id.prohibited' => __('Hanya transfer yang punya potongan admin.'),
+            'admin_fee_category_id.exists' => __('Kategori tidak ditemukan di workspace ini.'),
             'attachment.mimes' => __('Lampiran harus gambar (jpg, png, webp) atau PDF.'),
             'attachment.max' => __('Ukuran lampiran maksimal 2 MB.'),
         ];
@@ -158,6 +171,7 @@ class TransactionRequest extends FormRequest
             'transfer_to_account_id' => __('akun tujuan'),
             'tag_ids' => __('tag'),
             'admin_fee' => __('potongan admin'),
+            'admin_fee_category_id' => __('kategori potongan admin'),
             'attachment' => __('lampiran'),
         ];
     }
@@ -217,6 +231,17 @@ class TransactionRequest extends FormRequest
         }
 
         return Money::toCents($value);
+    }
+
+    /**
+     * Kategori pilihan user untuk baris potongan admin, atau null untuk
+     * memakai kategori otomatis "Biaya Admin".
+     */
+    public function adminFeeCategoryId(): ?int
+    {
+        $value = $this->validated('admin_fee_category_id');
+
+        return $value === null || $value === '' ? null : (int) $value;
     }
 
     private function type(): ?TransactionType

@@ -100,6 +100,87 @@ class TransactionAdminFeeTest extends TestCase
         );
     }
 
+    public function test_the_admin_fee_uses_the_category_picked_in_the_form(): void
+    {
+        [$source, $target] = $this->twoAccounts();
+
+        $category = Category::factory()
+            ->forWorkspace($this->signedInUser()->workspaces()->sole())
+            ->create(['name' => 'Fee Transfer']);
+
+        $this->createTransfer($source, $target, '100000.00', '5000.00', $category->id);
+
+        $fee = Transaction::allWorkspaces()->whereNotNull('parent_transaction_id')->sole();
+
+        $this->assertSame($category->id, $fee->category_id);
+        $this->assertSame('4895000.00', $source->fresh()->cached_balance);
+
+        // Kategori otomatis tidak ikut dibuat kalau user sudah memilih
+        // kategorinya sendiri.
+        $this->assertSame(
+            0,
+            Category::allWorkspaces()
+                ->where('workspace_id', $category->workspace_id)
+                ->where('name', AdminFeeManager::CATEGORY_NAME)
+                ->count(),
+        );
+    }
+
+    public function test_the_admin_fee_category_can_be_switched_while_editing(): void
+    {
+        [$source, $target] = $this->twoAccounts();
+
+        $category = Category::factory()
+            ->forWorkspace($this->signedInUser()->workspaces()->sole())
+            ->create(['name' => 'Fee Transfer']);
+
+        $transfer = $this->createTransfer($source, $target, '100000.00', '5000.00');
+
+        $this->assertSame(
+            AdminFeeManager::CATEGORY_NAME,
+            Category::allWorkspaces()->find(
+                Transaction::allWorkspaces()->whereNotNull('parent_transaction_id')->sole()->category_id,
+            )?->name,
+        );
+
+        $this->put(route('transactions.update', $transfer), [
+            'account_id' => $source->id,
+            'transfer_to_account_id' => $target->id,
+            'type' => TransactionType::Transfer->value,
+            'amount' => '100000.00',
+            'admin_fee' => '5000.00',
+            'admin_fee_category_id' => $category->id,
+            'occurred_at' => '2026-09-27',
+        ])->assertRedirect(route('transactions.index'));
+
+        // Mengganti kategori tidak mengubah nominal, jadi saldo tetap sama.
+        $this->assertSame('4895000.00', $source->fresh()->cached_balance);
+        $this->assertSame(
+            $category->id,
+            Transaction::allWorkspaces()->whereNotNull('parent_transaction_id')->sole()->category_id,
+        );
+    }
+
+    public function test_the_admin_fee_category_must_belong_to_the_workspace(): void
+    {
+        [$source, $target] = $this->twoAccounts();
+
+        $foreignCategory = Category::factory()->create(['name' => 'Fee Asing']);
+
+        $this->from(route('transactions.create'))->post(route('transactions.store'), [
+            'account_id' => $source->id,
+            'transfer_to_account_id' => $target->id,
+            'type' => TransactionType::Transfer->value,
+            'amount' => '100000.00',
+            'admin_fee' => '5000.00',
+            'admin_fee_category_id' => $foreignCategory->id,
+            'occurred_at' => '2026-09-27',
+        ])->assertSessionHasErrors('admin_fee_category_id');
+
+        $this->assertSame(0, Transaction::allWorkspaces()->count());
+        $this->assertSame('5000000.00', $source->fresh()->cached_balance);
+    }
+
     public function test_an_income_cannot_carry_an_admin_fee(): void
     {
         $account = Account::factory()
@@ -112,6 +193,7 @@ class TransactionAdminFeeTest extends TestCase
             'type' => TransactionType::Income->value,
             'amount' => '250000.00',
             'admin_fee' => '5000.00',
+            'admin_fee_category_id' => '',
             'occurred_at' => '2026-09-27',
         ])->assertSessionHasErrors('admin_fee');
 
@@ -394,14 +476,20 @@ class TransactionAdminFeeTest extends TestCase
     /**
      * Simpan sebuah transfer lewat HTTP dan kembalikan baris transfernya.
      */
-    private function createTransfer(Account $source, Account $target, string $amount, ?string $adminFee): Transaction
-    {
+    private function createTransfer(
+        Account $source,
+        Account $target,
+        string $amount,
+        ?string $adminFee,
+        ?int $adminFeeCategoryId = null,
+    ): Transaction {
         $this->post(route('transactions.store'), [
             'account_id' => $source->id,
             'transfer_to_account_id' => $target->id,
             'type' => TransactionType::Transfer->value,
             'amount' => $amount,
             'admin_fee' => $adminFee,
+            'admin_fee_category_id' => $adminFeeCategoryId,
             'occurred_at' => '2026-09-27',
         ])->assertRedirect(route('transactions.index'));
 
