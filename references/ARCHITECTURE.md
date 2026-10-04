@@ -34,6 +34,7 @@ Permintaan eksplisit: aplikasi **tidak boleh** membaca langsung ke database serv
 
 3. **Materialized aggregate tables (denormalized)**
     - `dashboard_snapshots` (per workspace, per bulan): total income, expense, net cash flow — diisi/diupdate oleh queue job, bukan dihitung on-the-fly dari `transactions` saat halaman dibuka.
+    - `dashboard_daily_snapshots` (per workspace, per tanggal): income/expense/net harian — granularitas harian untuk line chart dashboard, ditulis oleh job yang sama; hanya tanggal yang punya transaksi yang punya baris.
     - `net_worth_snapshots` (per workspace, per bulan): total aset, total kewajiban, net worth — dibuat oleh scheduled job bulanan + di-invalidate/dijadwalkan ulang saat ada perubahan signifikan.
     - `budget_progress_cache` (per workspace, kategori, bulan): total terpakai vs limit — di-update via listener saat transaksi masuk kategori terkait.
     - Halaman list & report membaca dari tabel agregat/cache ini, bukan `SUM()`/`GROUP BY` langsung ke tabel `transactions` mentah pada setiap request.
@@ -91,6 +92,7 @@ Transaksi baru disimpan
 - `debts(id, workspace_id, direction[payable|receivable], counterparty, principal, remaining, interest_rate, start_date, due_date, term_count, installment_amount, status[ongoing|settled|overdue], include_in_net_worth, account_id, note)`
 - `debt_payments(workspace_id, debt_id, transaction_id, amount, paid_at, note)`
 - `dashboard_snapshots(workspace_id, month, total_income, total_expense, net_cash_flow)`
+- `dashboard_daily_snapshots(workspace_id, date, total_income, total_expense, net_cash_flow)`
 - `financial_health_scores(workspace_id, month, savings_rate, dti, emergency_fund_months, score, label)`
 - `export_jobs(id, workspace_id, type, status, file_path)`
 - `backups(id, workspace_id, scope, file_path, created_at)`

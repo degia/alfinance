@@ -56,6 +56,38 @@ export type CashFlowTrend = {
     net_cash_flow: string;
 };
 
+/** Satu hari dalam deret harian (sumber line chart dashboard). */
+export type DailyCashFlowPoint = {
+    /** `YYYY-MM-DD`. */
+    date: string;
+    /** Angka hari saja ("1".."31") untuk label sumbu X. */
+    label: string;
+    /** Tanggal lengkap ("9 Sep 2026") untuk tooltip. */
+    tooltip_label: string;
+    income: string;
+    expense: string;
+    net_cash_flow: string;
+    /** False selama tanggal itu belum punya baris agregat harian. */
+    has_data: boolean;
+    is_today: boolean;
+};
+
+export type DailyCashFlow = {
+    month: string;
+    /**
+     * True selama agregat harian belum pernah dibuat untuk bulan ini. Titik
+     * tetap zero-filled supaya chart punya sumbu waktu yang lengkap; `has_data`
+     * per titik yang membedakan "nol" dari "belum ada".
+     */
+    is_pending: boolean;
+    /** Jumlah hari dalam bulan — selalu 28–31. */
+    days: number;
+    points: DailyCashFlowPoint[];
+    total_income: string;
+    total_expense: string;
+    net_cash_flow: string;
+};
+
 export type ExpenseBreakdownItem = {
     category_id: number;
     name: string;
@@ -94,6 +126,7 @@ export type DashboardProps = {
     trend_months: number;
     kpi: DashboardKpi;
     cash_flow: CashFlowTrend;
+    daily_cash_flow: DailyCashFlow;
     expense_breakdown: ExpenseBreakdown;
     recent_transactions: DashboardRecentTransaction[];
     health: FinancialHealth;

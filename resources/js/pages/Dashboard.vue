@@ -7,8 +7,12 @@ import {
     Chart,
     DoughnutController,
     ArcElement,
+    Filler,
     Legend,
+    LineController,
+    LineElement,
     LinearScale,
+    PointElement,
     Tooltip,
 } from 'chart.js';
 import { Head, router } from '@inertiajs/vue3';
@@ -35,8 +39,12 @@ Chart.register(
     CategoryScale,
     DoughnutController,
     ArcElement,
+    Filler,
     Legend,
+    LineController,
+    LineElement,
     LinearScale,
+    PointElement,
     Tooltip,
 );
 
@@ -263,6 +271,107 @@ function renderTrendChart(): void {
 
 /*
 |--------------------------------------------------------------------------
+| Tren harian
+|--------------------------------------------------------------------------
+| Line, bukan bar: yang di sini adalah urutan hari dalam satu bulan, bukan
+| perbandingan antar bulan. Bar tetap dipakai di `renderTrendChart()` karena
+| total per bulan lebih tepat dibaca sebagai kolom; line lebih tepat untuk
+| sebaran per hari, dan hari tanpa transaksi terlihat datar, bukan sebagai
+| kolom kosong yang memenuhi setengah kartu.
+|
+| Pembacaannya dari tabel agregat harian (`dashboard_daily_snapshots`), bukan
+| menjumlahkan transaksi per tanggal di halaman ini.
+*/
+const dailyCanvas = ref<HTMLCanvasElement | null>(null);
+let dailyChart: Chart | null = null;
+
+/*
+| Empty state: kartu menampilkan pesan, bukan canvas dengan dua garis datar.
+| "Belum ada rekap" dan "pengeluaran benar-benar nol" terlihat sama kalau
+| hanya andalkan grafik, padahal maknanya berbeda.
+*/
+const dailyHasData = computed(() =>
+    props.daily_cash_flow.points.some((point) => point.has_data),
+);
+
+function renderDailyChart(): void {
+    if (dailyCanvas.value === null) {
+        return;
+    }
+
+    dailyChart?.destroy();
+
+    const points = props.daily_cash_flow.points;
+
+    dailyChart = new Chart(dailyCanvas.value, {
+        type: 'line',
+        data: {
+            labels: points.map((point) => point.label),
+            datasets: [
+                {
+                    label: 'Pemasukan',
+                    data: points.map((point) => toNumber(point.income) ?? 0),
+                    borderColor: chartToken('income'),
+                    backgroundColor: chartToken('incomeSoft'),
+                    borderWidth: 2,
+                    fill: true,
+                },
+                {
+                    label: 'Pengeluaran',
+                    data: points.map((point) => toNumber(point.expense) ?? 0),
+                    borderColor: chartToken('expense'),
+                    backgroundColor: chartToken('expenseSoft'),
+                    borderWidth: 2,
+                    fill: true,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            animation: chartAnimation(),
+            plugins: {
+                legend: { display: true, position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        // Sumbu X sengaja hanya menampilkan angka hari, jadi
+                        // tanggal lengkap ditambahkan di judul tooltip.
+                        title: (items) =>
+                            items.length > 0
+                                ? (points[items[0].dataIndex]?.tooltip_label ??
+                                  '')
+                                : '',
+                        label: (context) =>
+                            formatCurrency(context.parsed.y ?? 0),
+                    },
+                },
+            },
+            scales: {
+                y: {
+                    ticks: {
+                        callback: (value) => formatCurrency(Number(value)),
+                    },
+                    grid: { color: chartToken('grid') },
+                },
+                x: {
+                    // 28–31 label dalam kartu yang lebarnya terbatas: Chart.js
+                    // boleh melewati sebagian supaya tanggal tetap terbaca,
+                    // bukan menumpuk.
+                    grid: { display: false },
+                    ticks: {
+                        autoSkip: true,
+                        maxRotation: 0,
+                        maxTicksLimit: 10,
+                    },
+                },
+            },
+        },
+    });
+}
+
+/*
+|--------------------------------------------------------------------------
 | Komposisi pengeluaran
 |--------------------------------------------------------------------------
 | Donut untuk lima kategori teratas; sisanya digabung jadi "Lainnya" supaya
@@ -389,11 +498,13 @@ function metricTarget(metric: FinancialHealthMetric): string {
 
 onMounted(() => {
     renderTrendChart();
+    renderDailyChart();
     renderBreakdownChart();
 });
 
 onBeforeUnmount(() => {
     trendChart?.destroy();
+    dailyChart?.destroy();
     breakdownChart?.destroy();
 });
 
@@ -401,6 +512,15 @@ watch(
     () => props.cash_flow.points,
     () => renderTrendChart(),
     { deep: true },
+);
+
+watch(
+    () => props.daily_cash_flow.points,
+    () => renderDailyChart(),
+    // `post` karena `<canvas>` ada di balik `v-if`: bulan yang tadinya kosong
+    // baru memasang canvas setelah patch DOM, jadi watcher `pre` (default)
+    // akan menggambar ke canvas yang masih null.
+    { deep: true, flush: 'post' },
 );
 
 watch(donutSlices, () => renderBreakdownChart(), { deep: true });
@@ -413,6 +533,7 @@ const { resolvedAppearance } = useAppearance();
 
 watch(resolvedAppearance, () => {
     renderTrendChart();
+    renderDailyChart();
     renderBreakdownChart();
 });
 </script>
@@ -537,6 +658,45 @@ watch(resolvedAppearance, () => {
                 </CardContent>
             </Card>
         </div>
+
+        <Card class="rounded-2xl border-0 shadow-neu-flat">
+            <CardContent class="flex flex-col gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h3 class="text-sm font-semibold">
+                            Pemasukan &amp; pengeluaran harian
+                        </h3>
+                        <p class="text-xs text-muted-foreground">
+                            Per hari di {{ props.kpi.month_label }} — hari tanpa
+                            transaksi terlihat datar, bukan berlubang
+                        </p>
+                    </div>
+
+                    <p class="text-xs text-muted-foreground">
+                        {{ formatCurrency(props.daily_cash_flow.total_income) }}
+                        masuk ·
+                        {{
+                            formatCurrency(props.daily_cash_flow.total_expense)
+                        }}
+                        keluar
+                    </p>
+                </div>
+
+                <div v-if="dailyHasData" class="h-64">
+                    <canvas ref="dailyCanvas" />
+                </div>
+
+                <p
+                    v-else
+                    class="neu-inset rounded-lg p-4 text-center text-xs text-muted-foreground"
+                >
+                    Belum ada rekap harian untuk
+                    {{ props.kpi.month_label }}. Rekap harian dihitung otomatis
+                    setiap kali ada transaksi yang berubah — halaman ini tidak
+                    menjumlahkan transaksi per tanggal secara langsung.
+                </p>
+            </CardContent>
+        </Card>
 
         <div class="grid gap-4 lg:grid-cols-3">
             <Card class="rounded-2xl border-0 shadow-neu-flat lg:col-span-2">

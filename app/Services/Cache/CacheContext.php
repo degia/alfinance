@@ -22,6 +22,9 @@ enum CacheContext: string
     /** Deret tren arus kas 6/12 bulan. */
     case DashboardCashFlow = 'dashboard-cash-flow';
 
+    /** Deret harian pemasukan/pengeluaran untuk satu bulan (line chart). */
+    case DashboardDaily = 'dashboard-daily';
+
     /** Donut/daftar pengeluaran per kategori untuk satu bulan. */
     case DashboardBreakdown = 'dashboard-breakdown';
 

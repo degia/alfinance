@@ -5,6 +5,7 @@ namespace App\Services\Dashboard;
 use App\Jobs\RecomputeDashboardSnapshotJob;
 use App\Models\Account;
 use App\Models\BudgetProgress;
+use App\Models\DashboardDailySnapshot;
 use App\Models\DashboardSnapshot;
 use App\Models\Transaction;
 use App\Services\Cache\CacheContext;
@@ -64,6 +65,7 @@ class DashboardService
             'trend_months' => $trendMonths,
             'kpi' => $this->kpi($workspaceId, $month),
             'cash_flow' => $this->cashFlowTrend($workspaceId, $month, $trendMonths),
+            'daily_cash_flow' => $this->dailyCashFlow($workspaceId, $month),
             'expense_breakdown' => $this->expenseBreakdown($workspaceId, $month),
             'recent_transactions' => $this->recentTransactions($workspaceId),
             'health' => $this->health->current($workspaceId, $month),
@@ -188,6 +190,102 @@ class DashboardService
                 ];
             },
         );
+
+        return $payload;
+    }
+
+    /**
+     * Deret harian pemasukan/pengeluaran untuk satu bulan — sumber line chart
+     * harian di dashboard.
+     *
+     * Bedanya dengan {@see cashFlowTrend()}: yang ini tidak boleh memakai
+     * `GROUP BY DATE(occurred_at)` ke `transactions`, jadi sumbernya
+     * `dashboard_daily_snapshots`, tabel agregat yang ditulis job yang sama
+     * seperti snapshot bulanan.
+     *
+     * Setiap hari dalam bulan — termasuk hari yang belum terjadi dan hari tanpa
+     * transaksi — tetap punya titik bernilai nol. Sumbu waktu harus penuh agar
+     * garis tidak menggantung melompati tanggal, dan jumlah titik harus tetap
+     * jumlah hari bulan itu supaya posisi titik selalu berarti tanggal yang sama.
+     *
+     * Hanya tanggal yang punya transaksi yang punya baris di tabel agregat, jadi
+     * `indexByDate` bisa bolong dan itu memang diharapkan.
+     *
+     * @return array<string, mixed>
+     */
+    public function dailyCashFlow(int $workspaceId, CarbonImmutable $month): array
+    {
+        $period = MonthPeriod::key($month);
+
+        $cached = $this->cache->get($workspaceId, CacheContext::DashboardDaily, $period);
+
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $rows = $this->indexByDate(
+            DashboardDailySnapshot::allWorkspaces()
+                ->where('workspace_id', $workspaceId)
+                ->ofMonth($month)
+                ->get(),
+        );
+
+        if ($rows === []) {
+            /*
+             * Sama seperti `kpi()`: baris harian belum ada karena workspace ini
+             * belum pernah punya agregat harian (tabel baru ditambahkan setelah
+             * snapshot bulanan sudah terisi). Membangunnya di sini berarti
+             * menjumlahkan `transactions` per tanggal di jalur request, jadi
+             * sebagai gantinya job dijadwalkan.
+             *
+             * Hasil pending ini sengaja TIDAK masuk cache, sama seperti
+             * `pendingKpi()`: job selesai dalam hitungan detik, sedangkan TTL
+             * cache 10 menit akan menahan tampilan "sedang dihitung" jauh lebih
+             * lama dari yang sebenarnya.
+             */
+            RecomputeDashboardSnapshotJob::dispatch($workspaceId, $period);
+
+            return $this->pendingDailyCashFlow($month, $period);
+        }
+
+        $days = $month->daysInMonth;
+        $first = $month->startOfMonth();
+        $today = CarbonImmutable::now()->toDateString();
+        $points = [];
+
+        for ($day = 1; $day <= $days; $day++) {
+            // `addDays` dari tanggal 1, bukan `setDate()`: batas `daysInMonth` sudah
+            // dijamin oleh loop, jadi tidak ada risiko overflow.
+            $date = $first->addDays($day - 1);
+            $key = $date->toDateString();
+            $snapshot = $rows[$key] ?? null;
+
+            $points[] = [
+                'date' => $key,
+                // Sumbu X hanya menampilkan angka hari ("1".."31"); tanggal
+                // lengkap ada di `tooltip_label` supaya label sumbu tetap
+                // muat di kartu yang sempit.
+                'label' => (string) $day,
+                'tooltip_label' => $date->translatedFormat('j M Y'),
+                'income' => $snapshot === null ? '0.00' : $snapshot->total_income,
+                'expense' => $snapshot === null ? '0.00' : $snapshot->total_expense,
+                'net_cash_flow' => $snapshot === null ? '0.00' : $snapshot->net_cash_flow,
+                'has_data' => $snapshot !== null,
+                'is_today' => $key === $today,
+            ];
+        }
+
+        $payload = [
+            'month' => $period,
+            'is_pending' => false,
+            'days' => $days,
+            'points' => $points,
+            'total_income' => Money::sum(array_column($points, 'income')),
+            'total_expense' => Money::sum(array_column($points, 'expense')),
+            'net_cash_flow' => Money::sum(array_column($points, 'net_cash_flow')),
+        ];
+
+        $this->cache->put($workspaceId, CacheContext::DashboardDaily, $payload, $period);
 
         return $payload;
     }
@@ -431,6 +529,67 @@ class DashboardService
             'income_change' => null,
             'expense_change' => null,
             'net_cash_flow_change' => null,
+        ];
+    }
+
+    /**
+     * Indeks baris harian per `Y-m-d` dalam bentuk array biasa.
+     *
+     * Alasan yang sama seperti {@see indexByMonth()}: `keyBy()->all()` tidak
+     * pernah berubah tipe kuncinya, sehingga akses kunci string berikutnya lolos
+     * secara statis dan `?? null` ikut dianggap tidak pernah null.
+     *
+     * @param  Collection<int, DashboardDailySnapshot>  $snapshots
+     * @return array<string, DashboardDailySnapshot>
+     */
+    private function indexByDate(Collection $snapshots): array
+    {
+        $index = [];
+
+        foreach ($snapshots as $snapshot) {
+            $index[$snapshot->dateKey()] = $snapshot;
+        }
+
+        return $index;
+    }
+
+    /**
+     * Bentuk deret harian saat agregat harian belum ada.
+     *
+     * Tetap zero-filled per hari (bukan array kosong) supaya frontend punya satu
+     * jalur render saja dan tidak perlu tahu mana yang "belum ada".
+     *
+     * @return array<string, mixed>
+     */
+    private function pendingDailyCashFlow(CarbonImmutable $month, string $period): array
+    {
+        $days = $month->daysInMonth;
+        $first = $month->startOfMonth();
+        $points = [];
+
+        for ($day = 1; $day <= $days; $day++) {
+            $date = $first->addDays($day - 1);
+
+            $points[] = [
+                'date' => $date->toDateString(),
+                'label' => (string) $day,
+                'tooltip_label' => $date->translatedFormat('j M Y'),
+                'income' => '0.00',
+                'expense' => '0.00',
+                'net_cash_flow' => '0.00',
+                'has_data' => false,
+                'is_today' => false,
+            ];
+        }
+
+        return [
+            'month' => $period,
+            'is_pending' => true,
+            'days' => $days,
+            'points' => $points,
+            'total_income' => '0.00',
+            'total_expense' => '0.00',
+            'net_cash_flow' => '0.00',
         ];
     }
 

@@ -4,6 +4,7 @@ namespace App\Services\Dashboard;
 
 use App\Enums\TransactionType;
 use App\Jobs\RecomputeDashboardSnapshotJob;
+use App\Models\DashboardDailySnapshot;
 use App\Models\DashboardSnapshot;
 use App\Models\Transaction;
 use App\Services\Budgets\BudgetService;
@@ -13,13 +14,18 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Membangun ulang `dashboard_snapshots` untuk satu workspace + bulan
- * (ARCHITECTURE.md §2.3 butir 3, PRD.md §3.1).
+ * Membangun ulang `dashboard_snapshots` + `dashboard_daily_snapshots` untuk satu
+ * workspace + bulan (ARCHITECTURE.md §2.3 butir 3, PRD.md §3.1).
  *
  * Ini satu-satunya tempat yang menjumlahkan `transactions` untuk kebutuhan
  * dashboard, dan ia hanya berjalan di dalam {@see RecomputeDashboardSnapshotJob}
  * — bukan di jalur request. Pembacaan dashboard memakai
  * {@see DashboardService} yang hanya membaca tabel ini lewat cache.
+ *
+ * Kedua granularitas dibangun dari SATU query: `GROUP BY DATE(occurred_at), type`.
+ * Bulanan dijumlahkan dari harian di dalam PHP, jadi tidak ada data yang
+ * dihitung dua kali dari dua statement yang bisa berbeda jawabannya (mis. transaksi
+ * yang jatuh persis di batas tengah malam).
  *
  * Mirip {@see BudgetService::recomputeForMonth()}:
  * - Idempoten. Hasilnya turunan penuh dari transaksi bulan itu, jadi menjalankan
@@ -30,7 +36,7 @@ use Illuminate\Support\Facades\DB;
 class DashboardAggregator
 {
     /**
-     * Hitung & simpan rekap satu bulan.
+     * Hitung & simpan rekap satu bulan (bulanan + harian).
      *
      * `total_transfer` dijumlahkan dari kedua sisi transfer (sumber + tujuan)
      * supaya nilainya berarti "nilai yang dipindahkan", bukan "perpindahan ke
@@ -49,10 +55,15 @@ class DashboardAggregator
             ->occurredBetween($from->toDateString(), $to->toDateString())
             // `toBase()` supaya hasilnya object biasa, bukan model: kolom
             // `type` lalu tetap string apa adanya (bukan enum ter-cast) dan
-            // tidak ada model yang perlu di-hydrate untuk tiga angka ini.
+            // tidak ada model yang perlu di-hydrate untuk angka-angka ini.
             ->toBase()
-            ->selectRaw('type, COALESCE(SUM(amount), 0) as type_total, COUNT(*) as type_count')
-            ->groupBy('type')
+            // `DATE(occurred_at)` tersedia di MySQL maupun SQLite, dan
+            // menghitung `day` tidak butuh index karena rentang `occurred_at`
+            // sudah dibatasi `occurredBetween` di atas.
+            ->selectRaw('DATE(occurred_at) as day, type, COALESCE(SUM(amount), 0) as type_total, COUNT(*) as type_count')
+            // Alias `day` boleh dipakai di GROUP BY pada MySQL maupun SQLite.
+            ->groupBy('day', 'type')
+            ->orderBy('day')
             ->get();
 
         $income = '0.00';
@@ -60,24 +71,41 @@ class DashboardAggregator
         $transfer = '0.00';
         $count = 0;
 
+        /** @var array<string, array{income: string, expense: string, count: int}> $daily */
+        $daily = [];
+
         foreach ($rows as $row) {
             $total = Money::fromDatabaseSum($row->type_total);
-            $count += (int) $row->type_count;
+            $typeCount = (int) $row->type_count;
+            $count += $typeCount;
+
+            $day = (string) $row->day;
+            $bucket = $daily[$day] ?? ['income' => '0.00', 'expense' => '0.00', 'count' => 0];
 
             switch ((string) $row->type) {
                 case TransactionType::Income->value:
-                    $income = $total;
+                    $income = Money::add($income, $total);
+                    $bucket['income'] = Money::add($bucket['income'], $total);
                     break;
                 case TransactionType::Expense->value:
-                    $expense = $total;
+                    $expense = Money::add($expense, $total);
+                    $bucket['expense'] = Money::add($bucket['expense'], $total);
                     break;
                 case TransactionType::Transfer->value:
-                    $transfer = $total;
+                    // Transfer tidak punya baris harian: grafik harian hanya
+                    // menampilkan kas yang benar-benar masuk/keluar, dan
+                    // transfer internal bukan keduanya.
+                    $transfer = Money::add($transfer, $total);
                     break;
             }
+
+            $bucket['count'] += $typeCount;
+            $daily[$day] = $bucket;
         }
 
-        return DB::transaction(function () use ($workspaceId, $month, $income, $expense, $transfer, $count): DashboardSnapshot {
+        return DB::transaction(function () use ($workspaceId, $month, $from, $to, $income, $expense, $transfer, $count, $daily): DashboardSnapshot {
+            $now = CarbonImmutable::now();
+
             // `whereYear` + `whereMonth`, bukan `where('month', ...)`: kolom
             // DATE di SQLite menyimpan komponen waktu (`2026-09-01 00:00:00`)
             // sedangkan MySQL memangkas jadi `2026-09-01`. Tanpa ini, hitung
@@ -101,11 +129,62 @@ class DashboardAggregator
             $snapshot->total_transfer = $transfer;
             $snapshot->net_cash_flow = Money::subtract($income, $expense);
             $snapshot->transaction_count = $count;
-            $snapshot->generated_at = CarbonImmutable::now();
+            $snapshot->generated_at = $now;
             $snapshot->save();
+
+            $this->replaceDailyRows($workspaceId, $from, $to, $daily, $now);
 
             return $snapshot;
         });
+    }
+
+    /**
+     * Tulis ulang baris harian satu bulan.
+     *
+     * Delete-then-insert, bukan upsert: tanggal yang tadinya punya transaksi lalu
+     * dihapus semua harus ikut hilang, sedangkan upsert hanya menyentuh tanggal
+     * yang ada di `$daily`. Menghapus per bulan membuat tabel tidak menumpuk
+     * baris kosong dari bulan-bulan lama.
+     *
+     * Karena seluruh baris bulan tersebut sudah dihapus lebih dulu, `insert()`
+     * tidak mungkin menabrak unique index `(workspace_id, date)` dan bisa
+     * dijahit jadi satu statement.
+     *
+     * @param  array<string, array{income: string, expense: string, count: int}>  $daily
+     */
+    private function replaceDailyRows(
+        int $workspaceId,
+        CarbonImmutable $from,
+        CarbonImmutable $to,
+        array $daily,
+        CarbonImmutable $generatedAt,
+    ): void {
+        DashboardDailySnapshot::allWorkspaces()
+            ->where('workspace_id', $workspaceId)
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->delete();
+
+        if ($daily === []) {
+            return;
+        }
+
+        $rows = [];
+
+        foreach ($daily as $day => $bucket) {
+            $rows[] = [
+                'workspace_id' => $workspaceId,
+                'date' => $day,
+                'total_income' => $bucket['income'],
+                'total_expense' => $bucket['expense'],
+                'net_cash_flow' => Money::subtract($bucket['income'], $bucket['expense']),
+                'transaction_count' => $bucket['count'],
+                'generated_at' => $generatedAt,
+                'created_at' => $generatedAt,
+                'updated_at' => $generatedAt,
+            ];
+        }
+
+        DashboardDailySnapshot::allWorkspaces()->insert($rows);
     }
 
     /**
