@@ -72,7 +72,7 @@ final class BackupService
         $workspaceId = (int) $backup->workspace_id;
         $scope = $backup->scope->value;
         $name = sprintf('backup-%d-%s-%s.json', $workspaceId, $scope, CarbonImmutable::now()->format('Ymd-His'));
-        $path = 'backups/'.$workspaceId.'/'.$name;
+        $path = $workspaceId.'/'.$name;
 
         $disk = Storage::disk('backups');
 
