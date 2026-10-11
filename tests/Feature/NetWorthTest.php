@@ -58,6 +58,8 @@ class NetWorthTest extends TestCase
                 ->where('summary.total_liabilities', '0.00')
                 ->where('summary.net_worth', '0.00')
                 ->where('items', [])
+                ->where('accounts', [])
+                ->where('debts', [])
                 ->has('series', 12)
                 ->where('series.0.has_snapshot', false));
     }
@@ -129,6 +131,69 @@ class NetWorthTest extends TestCase
                 ->where('summary.credit_card_outstanding', '0.00')
                 ->where('summary.total_assets', '500000.00')
                 ->where('summary.net_worth', '500000.00'));
+    }
+
+    public function test_account_balances_count_as_assets(): void
+    {
+        $workspace = $this->signedIn()->workspaces()->sole();
+
+        Account::factory()->forWorkspace($workspace)->cash('Dompet', '1500000.00')->create();
+        Account::factory()->forWorkspace($workspace)->saving('Tabungan', '10000000.00')->create();
+        Account::factory()->forWorkspace($workspace)->creditCard('Kartu', '10000000.00')
+            ->create(['cached_balance' => '-2000000.00']);
+
+        $this->get(route('net-worth.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                // Kas + tabungan = aset, kartu kredit = kewajiban.
+                ->where('summary.account_assets', '11500000.00')
+                ->where('summary.total_assets', '11500000.00')
+                ->where('summary.total_liabilities', '2000000.00')
+                ->where('summary.net_worth', '9500000.00')
+                ->has('accounts', 2)
+                ->where('accounts.0.name', 'Dompet')
+                ->where('accounts.0.balance', '1500000.00')
+                ->where('accounts.1.name', 'Tabungan')
+                ->where('accounts.1.is_savings', true)
+                ->has('credit_cards', 1)
+                ->where('credit_cards.0.outstanding', '2000000.00'));
+    }
+
+    public function test_archived_accounts_do_not_count(): void
+    {
+        $workspace = $this->signedIn()->workspaces()->sole();
+
+        Account::factory()->forWorkspace($workspace)->cash('Lama', '1000000.00')
+            ->create()
+            ->archive();
+
+        $this->get(route('net-worth.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('summary.account_assets', '0.00')
+                ->where('summary.total_assets', '0.00')
+                ->where('accounts', []));
+    }
+
+    public function test_debt_rows_are_exposed_with_their_side(): void
+    {
+        $workspace = $this->signedIn()->workspaces()->sole();
+
+        Debt::factory()->forWorkspace($workspace)->payable()
+            ->principal('3000000.00')->create(['counterparty' => 'Koperasi']);
+        Debt::factory()->forWorkspace($workspace)->receivable()
+            ->principal('750000.00')->create(['counterparty' => 'Kasbon']);
+
+        $this->get(route('net-worth.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('debts', 2)
+                ->where('debts.0.counterparty', 'Kasbon')
+                ->where('debts.0.side', 'asset')
+                ->where('debts.0.remaining', '750000.00')
+                ->where('debts.1.counterparty', 'Koperasi')
+                ->where('debts.1.side', 'liability')
+                ->where('debts.1.remaining', '3000000.00'));
     }
 
     public function test_debts_only_count_when_opted_in(): void

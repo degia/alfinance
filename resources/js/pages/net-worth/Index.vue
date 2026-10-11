@@ -15,7 +15,6 @@ import { Head, router, useForm } from '@inertiajs/vue3';
 import { Pencil, Plus, Trash2, TrendingDown, TrendingUp, X } from '@lucide/vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -161,6 +160,74 @@ const liabilities = computed(() =>
     props.items.filter((item) => item.type === 'liability'),
 );
 
+const assetDebts = computed(() =>
+    props.debts.filter((debt) => debt.side === 'asset'),
+);
+const liabilityDebts = computed(() =>
+    props.debts.filter((debt) => debt.side === 'liability'),
+);
+
+type AutoRow = {
+    key: string;
+    name: string;
+    detail: string;
+    amount: string;
+};
+
+/*
+| Baris yang dihitung sistem (saldo akun, kartu kredit, utang/piutang)
+| ditampilkan berdampingan dengan item manual, supaya kartu Aset/Kewajiban
+| mencerminkan seluruh angka di ringkasan — bukan cuma input manual.
+*/
+const assetAutoRows = computed<AutoRow[]>(() => [
+    ...props.accounts.map((account) => ({
+        key: `account-${account.id}`,
+        name: account.name,
+        detail: account.is_savings
+            ? `${account.type_label} · di luar saldo total`
+            : account.type_label,
+        amount: account.balance,
+    })),
+    ...assetDebts.value.map((debt) => ({
+        key: `debt-${debt.id}`,
+        name: debt.counterparty,
+        detail: debt.is_overdue ? 'Piutang · terlambat' : 'Piutang',
+        amount: debt.remaining,
+    })),
+]);
+
+const liabilityAutoRows = computed<AutoRow[]>(() => [
+    ...props.credit_cards.map((card) => ({
+        key: `card-${card.id}`,
+        name: card.name,
+        detail: card.credit_limit
+            ? `Kartu kredit · dari ${formatCurrency(card.credit_limit)}`
+            : 'Kartu kredit',
+        amount: card.outstanding,
+    })),
+    ...liabilityDebts.value.map((debt) => ({
+        key: `debt-${debt.id}`,
+        name: debt.counterparty,
+        detail: debt.is_overdue ? 'Utang · terlambat' : 'Utang',
+        amount: debt.remaining,
+    })),
+]);
+
+const groups = computed(() => [
+    {
+        title: 'Aset',
+        total: props.summary.total_assets,
+        auto: assetAutoRows.value,
+        items: assets.value,
+    },
+    {
+        title: 'Kewajiban',
+        total: props.summary.total_liabilities,
+        auto: liabilityAutoRows.value,
+        items: liabilities.value,
+    },
+]);
+
 const netWorthTone = computed(() => {
     const value = toNumber(props.summary.net_worth) ?? 0;
 
@@ -179,12 +246,12 @@ const summaryCards = computed(() => [
     {
         label: 'Total aset',
         value: props.summary.total_assets,
-        hint: `Item ${formatCurrency(props.summary.item_assets)} + kartu kredit overpay + piutang`,
+        hint: `Item ${formatCurrency(props.summary.item_assets)} + saldo akun ${formatCurrency(props.summary.account_assets)} + piutang ${formatCurrency(props.summary.debt_receivable)}`,
     },
     {
         label: 'Total kewajiban',
         value: props.summary.total_liabilities,
-        hint: `Item ${formatCurrency(props.summary.item_liabilities)} + kartu kredit + utang`,
+        hint: `Item ${formatCurrency(props.summary.item_liabilities)} + kartu kredit ${formatCurrency(props.summary.credit_card_outstanding)} + utang ${formatCurrency(props.summary.debt_payable)}`,
     },
     {
         label: 'Net worth',
@@ -384,25 +451,55 @@ watch(resolvedAppearance, renderChart);
 
         <div class="grid gap-4 lg:grid-cols-2">
             <Card
-                v-for="group in [
-                    { title: 'Aset', rows: assets },
-                    { title: 'Kewajiban', rows: liabilities },
-                ]"
+                v-for="group in groups"
                 :key="group.title"
                 class="rounded-2xl border-0 shadow-neu-flat"
             >
                 <CardContent class="flex flex-col gap-3">
-                    <h3 class="text-sm font-semibold">{{ group.title }}</h3>
+                    <div class="flex items-center justify-between gap-2">
+                        <h3 class="text-sm font-semibold">
+                            {{ group.title }}
+                        </h3>
+                        <span class="text-sm font-semibold">
+                            {{ formatCurrency(group.total) }}
+                        </span>
+                    </div>
 
                     <p
-                        v-if="group.rows.length === 0"
+                        v-if="
+                            group.auto.length === 0 && group.items.length === 0
+                        "
                         class="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground"
                     >
                         Belum ada item {{ group.title.toLowerCase() }}.
                     </p>
 
                     <div
-                        v-for="item in group.rows"
+                        v-for="row in group.auto"
+                        :key="row.key"
+                        class="neu-inset flex items-center justify-between gap-3 rounded-lg px-3 py-2"
+                    >
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-medium">
+                                {{ row.name }}
+                            </p>
+                            <p class="text-xs text-muted-foreground">
+                                {{ row.detail }}
+                                <span
+                                    class="ml-1 text-2xs font-medium tracking-wide uppercase"
+                                >
+                                    otomatis
+                                </span>
+                            </p>
+                        </div>
+
+                        <span class="text-sm font-semibold">
+                            {{ formatCurrency(row.amount) }}
+                        </span>
+                    </div>
+
+                    <div
+                        v-for="item in group.items"
                         :key="item.id"
                         class="neu-inset flex items-center justify-between gap-3 rounded-lg px-3 py-2"
                     >
@@ -445,37 +542,6 @@ watch(resolvedAppearance, renderChart);
                 </CardContent>
             </Card>
         </div>
-
-        <Card
-            v-if="props.credit_cards.length > 0"
-            class="rounded-2xl border-0 shadow-neu-flat"
-        >
-            <CardContent class="flex flex-col gap-3">
-                <h3 class="text-sm font-semibold">
-                    Utang kartu kredit
-                    <Badge variant="secondary" class="ml-2 text-2xs">
-                        otomatis
-                    </Badge>
-                </h3>
-
-                <div
-                    v-for="card in props.credit_cards"
-                    :key="card.id"
-                    class="flex items-center justify-between gap-3"
-                >
-                    <span class="text-sm">{{ card.name }}</span>
-                    <span class="text-sm font-medium">
-                        {{ formatCurrency(card.outstanding) }}
-                        <span
-                            v-if="card.credit_limit"
-                            class="text-xs text-muted-foreground"
-                        >
-                            dari {{ formatCurrency(card.credit_limit) }}
-                        </span>
-                    </span>
-                </div>
-            </CardContent>
-        </Card>
 
         <Dialog v-model:open="isFormOpen">
             <DialogContent class="sm:max-w-2xl">
