@@ -3,6 +3,7 @@ import { Link } from '@inertiajs/vue3';
 import {
     BookOpen,
     Building2,
+    Calculator,
     FileBarChart,
     FolderGit2,
     LayoutGrid,
@@ -35,6 +36,7 @@ import { index as budgetsIndex } from '@/routes/budgets';
 import { index as categoriesIndex } from '@/routes/categories';
 import { index as debtsIndex } from '@/routes/debts';
 import { index as exportsIndex } from '@/routes/exports';
+import { index as hitunganIndex } from '@/routes/hitungan';
 import { index as netWorthIndex } from '@/routes/net-worth';
 import { index as recurringRulesIndex } from '@/routes/recurring-rules';
 import { index as reportsIndex } from '@/routes/reports';
@@ -68,6 +70,11 @@ const mainNavItems: NavItem[] = [
         title: 'Anggaran',
         href: budgetsIndex(),
         icon: Target,
+    },
+    {
+        title: 'Hitungan',
+        href: hitunganIndex(),
+        icon: Calculator,
     },
     {
         title: 'Net worth',

@@ -5,6 +5,7 @@ export * from './category';
 export * from './dashboard';
 export * from './debt';
 export * from './export';
+export * from './hitungan';
 export * from './navigation';
 export * from './net-worth';
 export * from './report';

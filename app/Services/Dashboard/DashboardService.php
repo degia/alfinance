@@ -460,6 +460,28 @@ class DashboardService
     }
 
     /**
+     * Total pengeluaran transaksi pada hari ini.
+     *
+     * Sumbernya {@see DashboardDailySnapshot} — tabel agregat yang sama dengan
+     * line chart harian dashboard — bukan penjumlahan `transactions` di jalur
+     * request (ARCHITECTURE.md §2.1). Hari tanpa pengeluaran memang tidak punya
+     * baris, dan itu berarti nol.
+     *
+     * Angka ini menyusul setelah job agregat selesai, sama seperti angka
+     * dashboard lain: perubahan transaksi menghapus cache lalu
+     * {@see RecomputeDashboardSnapshotJob} membangun ulang baris harinya.
+     */
+    public function expensesToday(int $workspaceId): string
+    {
+        $snapshot = DashboardDailySnapshot::allWorkspaces()
+            ->where('workspace_id', $workspaceId)
+            ->whereDate('date', CarbonImmutable::now()->toDateString())
+            ->first();
+
+        return $snapshot === null ? Money::fromCents(0) : $snapshot->total_expense;
+    }
+
+    /**
      * Dua snapshot berurutan (bulan ini + bulan sebelumnya) dalam satu query.
      *
      * @return array{0: DashboardSnapshot|null, 1: DashboardSnapshot|null}

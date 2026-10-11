@@ -7,6 +7,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DebtController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\HitunganController;
 use App\Http\Controllers\NetWorthController;
 use App\Http\Controllers\RecurringRuleController;
 use App\Http\Controllers\ReportController;
@@ -175,6 +176,18 @@ Route::middleware(['auth', 'verified', 'workspace.selected'])->group(function ()
     Route::post('net-worth/items', [NetWorthController::class, 'store'])->name('net-worth.store');
     Route::put('net-worth/items/{net_worth_item}', [NetWorthController::class, 'update'])->name('net-worth.update');
     Route::delete('net-worth/items/{net_worth_item}', [NetWorthController::class, 'destroy'])->name('net-worth.destroy');
+
+    /*
+    |----------------------------------------------------------------------
+    | Hitungan (kalkulator anggaran bulanan)
+    |----------------------------------------------------------------------
+    | Perhitungan (saldo aktual, limit harian, total rencana) dijalankan di
+    | browser. Yang disimpan ke database hanya input rencananya — satu baris
+    | per workspace — supaya bisa dibuka kembali; `balance` selalu dihitung
+    | ulang dari total saldo akun saat halaman dimuat.
+    */
+    Route::get('hitungan', [HitunganController::class, 'index'])->name('hitungan.index');
+    Route::post('hitungan', [HitunganController::class, 'save'])->name('hitungan.save');
 
     /*
     |----------------------------------------------------------------------
