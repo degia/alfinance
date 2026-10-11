@@ -49,6 +49,9 @@ class NetWorthController extends Controller
                 'net_worth' => $summary['net_worth'],
                 'item_assets' => $summary['item_assets'],
                 'item_liabilities' => $summary['item_liabilities'],
+                // Saldo akun (kas/bank/e-wallet/tabungan) plus kartu kredit
+                // yang bayar lebih; ini sudah bagian dari total_assets.
+                'account_assets' => $summary['account_assets'],
                 // Dihitung dari baris kartu kredit yang sudah diambil
                 // `NetWorthService::current()`; memanggil
                 // `creditCardOutstanding()` lagi di sini berarti satu query
@@ -61,7 +64,9 @@ class NetWorthController extends Controller
                 'change' => $this->change(),
             ],
             'items' => $summary['items']->values()->all(),
+            'accounts' => $summary['accounts'],
             'credit_cards' => $summary['credit_cards'],
+            'debts' => $summary['debts'],
             'series' => $series,
             'year' => $year,
             'years' => $this->yearOptions(),

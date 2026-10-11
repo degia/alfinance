@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ChevronLeft, ChevronRight } from '@lucide/vue';
 import BudgetDetailDialog from '@/components/BudgetDetailDialog.vue';
@@ -32,6 +32,7 @@ import type {
     BudgetCell,
     BudgetFormData,
     BudgetIndexProps,
+    BudgetRow,
     BudgetStatus,
 } from '@/types';
 
@@ -84,6 +85,7 @@ const form = useForm<BudgetFormData>({
     category_id: '',
     month: props.month,
     limit_amount: '',
+    sub_limits: {},
 });
 
 const isDetailOpen = ref(false);
@@ -98,11 +100,89 @@ function openDetail(cell: BudgetCell): void {
     isDetailOpen.value = true;
 }
 
+/**
+ * Sub-kategori default terbuka. Menyimpan id kategori induk yang sedang
+ * DITUTUP; pilihan ini bertahan selama komponen hidup (mis. saat pindah bulan).
+ */
+const collapsed = ref<Set<number>>(new Set());
+
+function isExpanded(id: number): boolean {
+    return !collapsed.value.has(id);
+}
+
+function toggleRow(id: number): void {
+    const next = new Set(collapsed.value);
+
+    if (next.has(id)) {
+        next.delete(id);
+    } else {
+        next.add(id);
+    }
+
+    collapsed.value = next;
+}
+
+/** Jumlah sub-kategori per induk, untuk badge di baris induk. */
+const childCounts = computed(() => {
+    const counts = new Map<number, number>();
+
+    for (const row of props.categories) {
+        if (row.parent_id !== null) {
+            counts.set(row.parent_id, (counts.get(row.parent_id) ?? 0) + 1);
+        }
+    }
+
+    return counts;
+});
+
+/** Baris tampil: semua induk + sub-kategori dari induk yang sedang terbuka. */
+const visibleRows = computed(() =>
+    props.categories.filter(
+        (row) => row.parent_id === null || isExpanded(row.parent_id),
+    ),
+);
+
+/** Sub-kategori dari kategori yang sedang dipilih di dialog Tambah limit. */
+const selectedChildren = computed(() => {
+    const parentId = Number(form.category_id);
+
+    if (!parentId) {
+        return [];
+    }
+
+    return props.options.categories.filter(
+        (category) => category.parent_id === parentId,
+    );
+});
+
+// Ganti kategori -> buang limit sub-kategori dari kategori sebelumnya supaya
+// tidak ikut terkirim untuk induk yang berbeda.
+watch(
+    () => form.category_id,
+    () => {
+        form.sub_limits = {};
+    },
+);
+
+/** Klik sel: buka detail bila ada limit, atau form tambah limit bila belum. */
+function openCell(row: BudgetRow, cell: BudgetCell): void {
+    if (cell.budget_id !== null) {
+        openDetail(cell);
+
+        return;
+    }
+
+    if (canEdit.value) {
+        openCreate(cell.month, row.id);
+    }
+}
+
 function openCreate(month: string, categoryId?: number): void {
     form.defaults({
         category_id: categoryId === undefined ? '' : String(categoryId),
         month,
         limit_amount: '',
+        sub_limits: {},
     });
     form.reset();
     form.clearErrors();
@@ -140,7 +220,7 @@ const summaryCards = computed(() => [
     {
         label: 'Total limit',
         value: props.summary.total_limit,
-        hint: 'Jumlah limit yang terisi di tahun ini',
+        hint: 'Jumlah limit, tanpa hitung ganda',
     },
     {
         label: 'Total terpakai',
@@ -272,7 +352,7 @@ const summaryCards = computed(() => [
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="row in props.categories" :key="row.id">
+                            <tr v-for="row in visibleRows" :key="row.id">
                                 <th
                                     class="sticky left-0 z-10 bg-card px-3 py-2 text-left font-medium whitespace-nowrap"
                                     :class="
@@ -282,6 +362,28 @@ const summaryCards = computed(() => [
                                     "
                                 >
                                     <span class="flex items-center gap-2">
+                                        <button
+                                            v-if="row.has_children"
+                                            type="button"
+                                            class="-ml-1 flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                            :aria-expanded="isExpanded(row.id)"
+                                            :aria-label="`${isExpanded(row.id) ? 'Sembunyikan' : 'Tampilkan'} sub-kategori ${row.name}`"
+                                            @click="toggleRow(row.id)"
+                                        >
+                                            <ChevronRight
+                                                class="size-4 transition-transform"
+                                                :class="
+                                                    isExpanded(row.id)
+                                                        ? 'rotate-90'
+                                                        : ''
+                                                "
+                                            />
+                                        </button>
+                                        <span
+                                            v-else
+                                            class="size-5 shrink-0"
+                                            aria-hidden="true"
+                                        />
                                         <span
                                             class="size-2 shrink-0 rounded-full"
                                             :style="{
@@ -290,6 +392,12 @@ const summaryCards = computed(() => [
                                             }"
                                         />
                                         {{ row.name }}
+                                        <span
+                                            v-if="row.has_children"
+                                            class="rounded-full bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground"
+                                        >
+                                            {{ childCounts.get(row.id) ?? 0 }}
+                                        </span>
                                     </span>
                                 </th>
 
@@ -308,7 +416,7 @@ const summaryCards = computed(() => [
                                                 : ''
                                         "
                                         :aria-label="`Detail anggaran ${row.name} ${cell.month}`"
-                                        @click="openDetail(cell)"
+                                        @click="openCell(row, cell)"
                                     >
                                         <span
                                             class="text-2xs text-muted-foreground"
@@ -445,6 +553,49 @@ const summaryCards = computed(() => [
                             :aria-invalid="Boolean(form.errors.limit_amount)"
                         />
                         <InputError :message="form.errors.limit_amount" />
+                    </div>
+
+                    <div
+                        v-if="selectedChildren.length > 0"
+                        class="grid gap-3 rounded-xl border border-dashed p-3"
+                    >
+                        <div class="grid gap-1">
+                            <p class="text-sm font-medium">
+                                Limit sub-kategori (opsional)
+                            </p>
+                            <p class="text-xs text-muted-foreground">
+                                Kosongkan bila sub-kategori tidak perlu limit
+                                sendiri. Baris induk otomatis menghitung
+                                sub-kategori yang diisi.
+                            </p>
+                        </div>
+                        <div
+                            v-for="child in selectedChildren"
+                            :key="child.id"
+                            class="grid gap-1"
+                        >
+                            <Label
+                                :for="`budget-sub-${child.id}`"
+                                class="text-xs font-normal"
+                            >
+                                {{ child.name }}
+                            </Label>
+                            <Input
+                                :id="`budget-sub-${child.id}`"
+                                v-model="form.sub_limits[String(child.id)]"
+                                inputmode="numeric"
+                                placeholder="Opsional"
+                                class="shadow-neu-inset"
+                                :aria-invalid="
+                                    Boolean(
+                                        form.errors[`sub_limits.${child.id}`],
+                                    )
+                                "
+                            />
+                            <InputError
+                                :message="form.errors[`sub_limits.${child.id}`]"
+                            />
+                        </div>
                     </div>
 
                     <DialogFooter>

@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Workspace;
 use App\Support\MonthPeriod;
 use App\Support\Workspace\ActiveWorkspace;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -35,6 +36,33 @@ class BudgetRequest extends FormRequest
             ],
             'month' => ['required', 'string', 'date_format:Y-m'],
             'limit_amount' => ['required', 'decimal:0,2', 'min:0.01', 'max:9999999999999.99'],
+            // Limit opsional untuk tiap sub-kategori dari kategori terpilih.
+            'sub_limits' => [
+                'sometimes',
+                'array',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! is_array($value)) {
+                        return;
+                    }
+
+                    $parentId = (int) $this->input('category_id');
+                    $childIds = Category::query()
+                        ->where('workspace_id', $this->workspaceId())
+                        ->where('parent_id', $parentId)
+                        ->pluck('id')
+                        ->map(static fn (mixed $id): int => (int) $id)
+                        ->all();
+
+                    foreach (array_keys($value) as $categoryId) {
+                        if (! in_array((int) $categoryId, $childIds, true)) {
+                            $fail(__('Sub-kategori tidak valid untuk kategori yang dipilih.'));
+
+                            return;
+                        }
+                    }
+                },
+            ],
+            'sub_limits.*' => ['nullable', 'decimal:0,2', 'min:0.01', 'max:9999999999999.99'],
         ];
     }
 
@@ -51,6 +79,8 @@ class BudgetRequest extends FormRequest
             'limit_amount.required' => __('Limit anggaran wajib diisi.'),
             'limit_amount.min' => __('Limit harus lebih besar dari nol.'),
             'limit_amount.max' => __('Limit melebihi batas maksimum yang disimpan.'),
+            'sub_limits.*.min' => __('Limit sub-kategori harus lebih besar dari nol.'),
+            'sub_limits.*.max' => __('Limit sub-kategori melebihi batas maksimum yang disimpan.'),
         ];
     }
 
@@ -63,6 +93,7 @@ class BudgetRequest extends FormRequest
             'category_id' => __('kategori'),
             'month' => __('bulan'),
             'limit_amount' => __('limit'),
+            'sub_limits.*' => __('limit sub-kategori'),
         ];
     }
 
@@ -83,6 +114,33 @@ class BudgetRequest extends FormRequest
     public function category(): Category
     {
         return Category::query()->findOrFail((int) $this->validated('category_id'));
+    }
+
+    /**
+     * Limit sub-kategori yang diisi pengguna; entri kosong dibuang.
+     *
+     * @return array<int, string> `category_id => limit`
+     */
+    public function subLimits(): array
+    {
+        $validated = $this->validated();
+        $raw = $validated['sub_limits'] ?? [];
+
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $limits = [];
+
+        foreach ($raw as $categoryId => $amount) {
+            if ($amount === null || $amount === '') {
+                continue;
+            }
+
+            $limits[(int) $categoryId] = (string) $amount;
+        }
+
+        return $limits;
     }
 
     private function workspaceId(): int

@@ -385,6 +385,135 @@ class BudgetsTest extends TestCase
                 ->where('categories.0.months.0.limit', null));
     }
 
+    public function test_the_matrix_lists_each_category_once_with_children_nested(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+
+        $parent = Category::factory()->forWorkspace($workspace)->create(['name' => 'Makan']);
+        Category::factory()->forWorkspace($workspace)->childOf($parent)->create(['name' => 'Sayur']);
+        Category::factory()->forWorkspace($workspace)->childOf($parent)->create(['name' => 'Buah']);
+
+        $this->get(route('budgets.index', ['year' => 2026]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->has('categories', 3)
+                // Induk muncul sekali, ditandai punya anak.
+                ->where('categories.0.name', 'Makan')
+                ->where('categories.0.parent_id', null)
+                ->where('categories.0.has_children', true)
+                ->where('categories.0.is_nested', false)
+                // Sub-kategori muncul SEKALI, bersarang (diurut nama) di bawah induk.
+                ->where('categories.1.name', 'Buah')
+                ->where('categories.1.parent_id', $parent->id)
+                ->where('categories.1.has_children', false)
+                ->where('categories.1.is_nested', true)
+                ->where('categories.2.name', 'Sayur')
+                ->where('categories.2.parent_id', $parent->id)
+                ->where('categories.2.is_nested', true));
+    }
+
+    public function test_the_parent_row_and_summary_include_the_subcategories(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+        $account = Account::factory()->forWorkspace($workspace)->cash()->create();
+
+        $parent = Category::factory()->forWorkspace($workspace)->create(['name' => 'Makan']);
+        $child = Category::factory()->forWorkspace($workspace)->childOf($parent)->create(['name' => 'Sayur']);
+
+        $this->budgetFor($workspace, $parent, '2026-09', '1000000.00');
+        $this->budgetFor($workspace, $child, '2026-09', '300000.00');
+
+        Transaction::factory()->forWorkspace($workspace)->from($account)
+            ->expense('100000.00')->for($child)->on('2026-09-05')->create();
+
+        $this->refreshProgress($workspace, '2026-09');
+
+        $this->get(route('budgets.index', ['year' => 2026]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                // Baris induk = gabungan limit induk + sub-kategori (rollup used).
+                ->where('categories.0.name', 'Makan')
+                ->where('categories.0.months.8.limit', '1300000.00')
+                ->where('categories.0.months.8.own_limit', '1000000.00')
+                ->where('categories.0.months.8.used', '100000.00')
+                // Baris anak tetap menampilkan limit & pemakaiannya sendiri.
+                ->where('categories.1.name', 'Sayur')
+                ->where('categories.1.months.8.limit', '300000.00')
+                ->where('categories.1.months.8.used', '100000.00')
+                // Ringkasan menjumlah baris induk saja, jadi tidak dobel.
+                ->where('summary.total_limit', '1300000.00')
+                ->where('summary.total_used', '100000.00')
+                ->where('summary.total_remaining', '1200000.00'));
+    }
+
+    public function test_storing_a_parent_limit_can_also_store_subcategory_limits(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+
+        $parent = Category::factory()->forWorkspace($workspace)->create(['name' => 'Makan']);
+        $child = Category::factory()->forWorkspace($workspace)->childOf($parent)->create(['name' => 'Sayur']);
+
+        $this->post(route('budgets.store'), [
+            'category_id' => $parent->id,
+            'month' => '2026-09',
+            'limit_amount' => '1000000.00',
+            'sub_limits' => [
+                (string) $child->id => '300000.00',
+            ],
+        ])->assertRedirect(route('budgets.index', ['month' => '2026-09', 'year' => 2026]));
+
+        $budgets = Budget::allWorkspaces()->get()->keyBy('category_id');
+
+        $this->assertSame('1000000.00', $budgets[$parent->id]->limit_amount);
+        $this->assertSame('300000.00', $budgets[$child->id]->limit_amount);
+    }
+
+    public function test_a_subcategory_limit_must_be_a_child_of_the_selected_category(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+
+        $parent = Category::factory()->forWorkspace($workspace)->create(['name' => 'Makan']);
+        $other = Category::factory()->forWorkspace($workspace)->create(['name' => 'Transport']);
+
+        $this->post(route('budgets.store'), [
+            'category_id' => $parent->id,
+            'month' => '2026-09',
+            'limit_amount' => '1000000.00',
+            'sub_limits' => [
+                (string) $other->id => '300000.00',
+            ],
+        ])->assertSessionHasErrors('sub_limits');
+
+        $this->assertSame(0, Budget::allWorkspaces()->count());
+    }
+
+    public function test_a_child_limit_still_counts_when_the_parent_has_no_limit(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+        $account = Account::factory()->forWorkspace($workspace)->cash()->create();
+
+        $parent = Category::factory()->forWorkspace($workspace)->create(['name' => 'Makan']);
+        $child = Category::factory()->forWorkspace($workspace)->childOf($parent)->create(['name' => 'Sayur']);
+
+        $this->budgetFor($workspace, $child, '2026-09', '300000.00');
+
+        Transaction::factory()->forWorkspace($workspace)->from($account)
+            ->expense('100000.00')->for($child)->on('2026-09-05')->create();
+
+        $this->refreshProgress($workspace, '2026-09');
+
+        $this->get(route('budgets.index', ['year' => 2026]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('summary.total_limit', '300000.00')
+                ->where('summary.total_used', '100000.00')
+                ->where('summary.total_remaining', '200000.00'));
+    }
+
     public function test_the_recompute_job_is_unique_per_workspace_and_month(): void
     {
         Queue::fake();

@@ -17,18 +17,17 @@ use Illuminate\Support\Collection;
 /**
  * Perhitungan net worth (PRD.md §3.6).
  *
- * Tiga sumber, dijumlahkan dalam satu angka:
+ * Empat sumber, dijumlahkan dalam satu angka:
  * 1. item manual di `net_worth_items` (aset & kewajiban), memakai
  *    `NetWorthItem::valueAt()` sehingga `annual_rate`-nya ikut dikompounding;
- * 2. outstanding kartu kredit dari `accounts.cached_balance` — sudah otomatis
- *    ada di sana, jadi tidak pernah diinput dua kali;
- * 3. utang/piutang yang mencentang `include_in_net_worth`.
- *
- * Sisi uang tunai (cash, bank, e-wallet dengan saldo positif) SENGAJA tidak
- * dihitung sebagai aset di sini. Kalau iya, setiap saldo akun yang positif
- * otomatis jadi aset dan modul ini hanya jadi penacal ulang saldo. Aset
- * likuid user sudah dijaga TransactionManager di `accounts.cached_balance`
- * (ARCHITECTURE.md §2.2), jadi sumber kebenaran tidak boleh dihitung dua kali.
+ * 2. saldo akun non-kartu-kredit (kas, bank, e-wallet, tabungan) yang positif
+ *    dihitung sebagai aset. Tabungan memang harus masuk Kekayaan Bersih
+ *    (PRD.md §3.2), dan `accounts.cached_balance` adalah sumber kebenaran
+ *    tunggalnya (ARCHITECTURE.md §2.2) — jadi angkanya dibaca apa adanya,
+ *    bukan dihitung ulang dari transaksi;
+ * 3. outstanding kartu kredit dari `accounts.cached_balance`: saldo negatif
+ *    jadi kewajiban, saldo positif (bayar lebih) jadi aset;
+ * 4. utang/piutang yang mencentang `include_in_net_worth`.
  *
  * Snapshot bulanan ditulis ke `net_worth_snapshots` supaya grafik tren cukup
  * satu `SELECT` dan tidak pernah menghitung ulang sejarah dari ribuan baris
@@ -48,11 +47,15 @@ class NetWorthService
         $items = $this->items($workspaceId, $asOf);
         $credit = $this->creditCardOutstanding($workspaceId);
         $debts = $this->debtPositions($workspaceId, $asOf);
+        $accounts = $this->accountPositions($workspaceId);
 
         $itemAssets = Money::sum($items->where('type', NetWorthItemType::Asset->value)->pluck('value'));
         $itemLiabilities = Money::sum($items->where('type', NetWorthItemType::Liability->value)->pluck('value'));
 
-        $totalAssets = Money::add($itemAssets, $credit['overpay']);
+        // Saldo akun — termasuk kartu kredit yang bayar lebih — menambah aset.
+        $accountAssets = Money::add($accounts['total'], $credit['overpay']);
+        $totalAssets = Money::add($itemAssets, $accountAssets);
+
         $totalLiabilities = Money::add(
             Money::add($itemLiabilities, $credit['outstanding']),
             $debts['payable'],
@@ -67,11 +70,14 @@ class NetWorthService
             'total_liabilities' => $totalLiabilities,
             'net_worth' => $netWorth,
             'items' => $items,
+            'accounts' => $accounts['rows'],
             'credit_cards' => $credit['accounts'],
+            'debts' => $debts['rows'],
             'debt_payable' => $debts['payable'],
             'debt_receivable' => $debts['receivable'],
             'item_assets' => $itemAssets,
             'item_liabilities' => $itemLiabilities,
+            'account_assets' => $accountAssets,
         ];
     }
 
@@ -209,37 +215,96 @@ class NetWorthService
     }
 
     /**
+     * Saldo akun non-kartu-kredit sebagai aset net worth.
+     *
+     * Tabungan ikut dihitung (PRD.md §3.2) meski di luar "saldo total":
+     * menabung bukan mengurangi harta. Saldo negatif diabaikan karena akun
+     * kas/bank/e-wallet tidak dirancang untuk defisit — transfer keluar yang
+     * melebihi saldo (mis. saat melunasi kartu kredit) tidak boleh berubah
+     * jadi kewajiban baru.
+     *
+     * @return array{total: string, rows: array<int, array<string, mixed>>}
+     */
+    public function accountPositions(int $workspaceId): array
+    {
+        $accounts = Account::allWorkspaces()
+            ->where('workspace_id', $workspaceId)
+            ->where('type', '!=', AccountType::CreditCard->value)
+            ->active()
+            ->orderBy('name')
+            ->get();
+
+        $total = '0.00';
+        $rows = [];
+
+        foreach ($accounts as $account) {
+            $balance = Money::atLeastZero($account->cached_balance);
+
+            if (Money::toCents($balance) <= 0) {
+                continue;
+            }
+
+            $total = Money::add($total, $balance);
+
+            $rows[] = [
+                'id' => (int) $account->id,
+                'name' => $account->name,
+                'type' => $account->type->value,
+                'type_label' => $account->type->label(),
+                'is_savings' => $account->isSavings(),
+                'balance' => $balance,
+            ];
+        }
+
+        return ['total' => $total, 'rows' => $rows];
+    }
+
+    /**
      * Posisi utang & piutang yang opts-in ke net worth.
      *
      * Hanya yang `include_in_net_worth` dan belum `settled`; `overdue` tetap
-     * dihitung (justru itu yang paling penting dilihat).
+     * dihitung (justru itu yang paling penting dilihat). `rows` dikembalikan
+     * supaya halaman net worth bisa menampilkan sumber angkanya, bukan cuma
+     * totalnya.
      *
-     * @return array{payable: string, receivable: string}
+     * @return array{payable: string, receivable: string, rows: array<int, array<string, mixed>>}
      */
     public function debtPositions(int $workspaceId, ?CarbonImmutable $asOf = null): array
     {
         $asOf ??= CarbonImmutable::today();
 
-        $rows = Debt::allWorkspaces()
+        $debts = Debt::allWorkspaces()
             ->where('workspace_id', $workspaceId)
             ->where('include_in_net_worth', true)
             ->where('status', '!=', DebtStatus::Settled->value)
+            ->orderBy('counterparty')
             ->get();
 
         $payable = '0.00';
         $receivable = '0.00';
+        $rows = [];
 
-        foreach ($rows as $debt) {
+        foreach ($debts as $debt) {
             $amount = Money::atLeastZero($debt->remaining);
+            $isPayable = $debt->isPayable();
 
-            if ($debt->isPayable()) {
+            if ($isPayable) {
                 $payable = Money::add($payable, $amount);
             } else {
                 $receivable = Money::add($receivable, $amount);
             }
+
+            $rows[] = [
+                'id' => (int) $debt->id,
+                'counterparty' => $debt->counterparty,
+                'side' => $isPayable ? 'liability' : 'asset',
+                'remaining' => $amount,
+                'due_date' => $debt->due_date?->toDateString(),
+                'is_overdue' => $debt->isOverdue($asOf),
+            ];
         }
 
-        return ['payable' => $payable, 'receivable' => $receivable];
+        return ['payable' => $payable, 'receivable' => $receivable, 'rows' => $rows];
     }
 
     /**

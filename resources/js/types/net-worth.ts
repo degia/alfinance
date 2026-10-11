@@ -49,6 +49,27 @@ export type NetWorthCreditCard = {
     usage_percent: number | null;
 };
 
+/** Saldo akun (kas/bank/e-wallet/tabungan) yang ikut sebagai aset net worth. */
+export type NetWorthAccount = {
+    id: number;
+    name: string;
+    type: string;
+    type_label: string;
+    /** Tabungan: ikut net worth, tapi tidak ikut "saldo total" harian. */
+    is_savings: boolean;
+    balance: string;
+};
+
+/** Utang (kewajiban) atau piutang (aset) yang ikut net worth. */
+export type NetWorthDebt = {
+    id: number;
+    counterparty: string;
+    side: 'asset' | 'liability';
+    remaining: string;
+    due_date: string | null;
+    is_overdue: boolean;
+};
+
 export type NetWorthChange = {
     direction: 'up' | 'down' | 'flat';
     amount: string;
@@ -60,6 +81,7 @@ export type NetWorthSummary = {
     net_worth: string;
     item_assets: string;
     item_liabilities: string;
+    account_assets: string;
     credit_card_outstanding: string;
     debt_payable: string;
     debt_receivable: string;
@@ -80,7 +102,9 @@ export type NetWorthPoint = {
 export type NetWorthIndexProps = {
     summary: NetWorthSummary;
     items: NetWorthItem[];
+    accounts: NetWorthAccount[];
     credit_cards: NetWorthCreditCard[];
+    debts: NetWorthDebt[];
     series: NetWorthPoint[];
     year: number;
     years: number[];

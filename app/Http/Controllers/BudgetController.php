@@ -44,13 +44,17 @@ class BudgetController extends Controller
         $month = $this->resolveMonth($request->query('month'));
         $year = (int) $request->query('year', $month->year);
 
+        // Baris dihitung sekali lalu dipakai untuk matriks + ringkasan supaya
+        // agregasi cabang tidak dijalankan dua kali per request.
+        $rows = $this->categoryRows($year);
+
         return Inertia::render('budgets/Index', [
             'month' => MonthPeriod::key($month),
             'month_label' => MonthPeriod::label(MonthPeriod::key($month)),
             'year' => $year,
-            'categories' => $this->categoryRows($year),
+            'categories' => $rows,
             'months' => $this->monthColumns($year),
-            'summary' => $this->summary($year, $month),
+            'summary' => $this->summary($rows, $month),
             'options' => $this->formOptions(),
         ]);
     }
@@ -61,11 +65,36 @@ class BudgetController extends Controller
 
         $attributes = $request->budgetAttributes();
         $category = $request->category();
+        $actorId = $request->user()->id;
 
         $budget = $this->budgets->upsert([
             'month' => $attributes['month'],
             'limit_amount' => $attributes['limit_amount'],
-        ], $category, $request->user()->id);
+        ], $category, $actorId);
+
+        // Limit sub-kategori opsional: masing-masing jadi baris budget sendiri
+        // di bulan yang sama, sehingga baris induk menampilkan cabang lengkap.
+        $subLimits = $request->subLimits();
+
+        if ($subLimits !== []) {
+            $children = Category::query()
+                ->whereIn('id', array_keys($subLimits))
+                ->get()
+                ->keyBy(static fn (Category $child): int => (int) $child->id);
+
+            foreach ($subLimits as $categoryId => $limit) {
+                $child = $children->get($categoryId);
+
+                if (! $child instanceof Category) {
+                    continue;
+                }
+
+                $this->budgets->upsert([
+                    'month' => $attributes['month'],
+                    'limit_amount' => $limit,
+                ], $child, $actorId);
+            }
+        }
 
         Inertia::flash('toast', [
             'type' => 'success',
@@ -238,7 +267,13 @@ class BudgetController extends Controller
     */
 
     /**
-     * Baris matriks: satu kategori (dengan sub-kategorinya) per tahun terpilih.
+     * Baris matriks: satu kategori induk (beserta sub-kategorinya) per tahun.
+     *
+     * Baris induk adalah ringkasan satu cabang: limit = limit sendiri + limit
+     * semua sub-kategorinya, dan `used` = rollup sub-kategori (dari cache).
+     * Sub-kategori tetap punya barisnya sendiri saat dibuka. Jadi angka cabang
+     * dan angka per kategori sama-sama tersedia tanpa menghitung dua kali di
+     * ringkasan (lihat {@see self::summary()}).
      *
      * `used` dibaca per bulan dari cache, jadi controller ini tidak pernah
      * menyentuh tabel `transactions`.
@@ -257,27 +292,26 @@ class BudgetController extends Controller
             ->get()
             ->keyBy(static fn (Budget $budget): string => $budget->category_id.'-'.$budget->monthKey());
 
-        // Satu query cache untuk seluruh matriks, lalu dipasang manual:
-        // pasangan key `progress` majemuk sehingga tidak bisa di-eager-load.
+        // Satu query cache untuk seluruh matriks. `used` dibaca dari sini
+        // (bukan lewat relasi budget) karena kategori tanpa limit pun punya
+        // angka pemakaian, dan baris induk menampilkan rollup anaknya.
         $progress = BudgetProgress::query()
             ->whereYear('month', $year)
             ->get()
             ->keyBy(static fn (BudgetProgress $row): string => $row->category_id.'-'.$row->monthKey());
 
-        foreach ($budgets as $budget) {
-            $budget->setRelation('progress', $progress->get($budget->category_id.'-'.$budget->monthKey()));
-        }
-
         $rows = [];
 
-        foreach ($categories as $category) {
-            $rows[] = $this->row($category, $year, $budgets);
+        // Hanya kategori induk yang jadi baris utama. Tiap sub-kategori
+        // muncul SEKALI sebagai baris bersarang di bawah induknya; `children`
+        // sudah eager-load di query di atas.
+        foreach ($categories->whereNull('parent_id') as $category) {
+            $children = $category->children->sortBy('name')->values();
 
-            // `children` sudah eager-load di query kategori di atas. Memakai
-            // relasi yang ter-load (diurutkan di PHP) supaya matriks anggaran
-            // tidak memicu satu query anak per kategori induk.
-            foreach ($category->children->sortBy('name') as $child) {
-                $rows[] = $this->row($child, $year, $budgets, nested: true);
+            $rows[] = $this->row($category, $year, $budgets, $progress, $children);
+
+            foreach ($children as $child) {
+                $rows[] = $this->row($child, $year, $budgets, $progress, nested: true);
             }
         }
 
@@ -286,28 +320,55 @@ class BudgetController extends Controller
 
     /**
      * @param  Collection<string, Budget>  $budgets
+     * @param  Collection<string, BudgetProgress>  $progress
+     * @param  iterable<int, Category>  $children
      * @return array<string, mixed>
      */
-    private function row(Category $category, int $year, $budgets, bool $nested = false): array
-    {
+    private function row(
+        Category $category,
+        int $year,
+        $budgets,
+        $progress,
+        iterable $children = [],
+        bool $nested = false,
+    ): array {
         $months = [];
 
         foreach (MonthPeriod::monthsOfYear($year) as $month) {
             $key = MonthPeriod::key($month);
             /** @var Budget|null $budget */
             $budget = $budgets->get($category->id.'-'.$key);
+            $ownLimit = $budget?->limit_amount;
 
-            $limit = $budget?->limit_amount;
-            $used = $budget?->usedAmount() ?? '0.00';
+            // Baris induk merangkum cabangnya: limit sendiri + limit semua
+            // sub-kategori. Untuk baris daun, `$children` kosong sehingga
+            // `limit` tetap limit kategorinya sendiri.
+            $childLimits = [];
+
+            foreach ($children as $child) {
+                $childLimits[] = $budgets->get($child->id.'-'.$key)?->limit_amount;
+            }
+
+            $childTotal = Money::sum($childLimits);
+            $hasLimit = $ownLimit !== null || Money::toCents($childTotal) !== 0;
+            $limit = $hasLimit ? Money::add($ownLimit, $childTotal) : null;
+
+            $progressRow = $progress->get($category->id.'-'.$key);
+            $used = $progressRow === null ? '0.00' : (string) $progressRow->used_amount;
+            $used = Money::fromCents(Money::toCents($used));
+            $percent = $limit === null ? null : Money::ratioOf($used, $limit);
 
             $months[] = [
                 'month' => $key,
                 'budget_id' => $budget?->id,
                 'limit' => $limit,
+                // Limit kategori ini sendiri, tanpa sub-kategori. Dipakai form
+                // ubah limit supaya tidak menimpa nilai gabungan cabang.
+                'own_limit' => $ownLimit,
                 'used' => $used,
-                'remaining' => $budget === null ? null : $budget->remaining(),
-                'percent' => $budget?->usedPercent(),
-                'status' => ($budget?->status() ?? BudgetStatus::Unset)->value,
+                'remaining' => $limit === null ? null : Money::subtract($limit, $used),
+                'percent' => $percent,
+                'status' => BudgetStatus::fromPercent($percent)->value,
             ];
         }
 
@@ -315,6 +376,8 @@ class BudgetController extends Controller
             'id' => (int) $category->id,
             'name' => $category->name,
             'color' => $category->color,
+            'parent_id' => $category->parent_id === null ? null : (int) $category->parent_id,
+            'has_children' => $category->children->isNotEmpty(),
             'is_nested' => $nested,
             'is_child' => $category->isChild(),
             'months' => $months,
@@ -341,12 +404,17 @@ class BudgetController extends Controller
      * Ringkasan tahun berjalan: total limit, total terpakai, dan jumlah
      * kategori per status.
      *
+     * Total hanya menjumlah baris INDUK. Baris induk sudah menggabungkan limit
+     * & pemakaian seluruh sub-kategorinya (lihat {@see self::categoryRows()}),
+     * jadi sub-kategori tidak ikut dijumlah lagi — tidak ada hitung ganda.
+     * `by_status` tetap menghitung tiap kategori sekali supaya tetap terlihat
+     * kategori mana yang sedang waspada/lewat.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
      * @return array<string, mixed>
      */
-    private function summary(int $year, CarbonImmutable $month): array
+    private function summary(array $rows, CarbonImmutable $month): array
     {
-        $rows = $this->categoryRows($year);
-
         $totalLimit = '0.00';
         $totalUsed = '0.00';
         $byStatus = [
@@ -360,19 +428,23 @@ class BudgetController extends Controller
 
         foreach ($rows as $row) {
             foreach ($row['months'] as $cell) {
-                if ($cell['month'] !== $monthKey) {
+                if ($cell['month'] === $monthKey) {
+                    $byStatus[$cell['status']] = $byStatus[$cell['status']] + 1;
+                }
+            }
+
+            // Angka cabang sudah ada di baris induknya.
+            if ($row['parent_id'] !== null) {
+                continue;
+            }
+
+            foreach ($row['months'] as $cell) {
+                if ($cell['limit'] === null) {
                     continue;
                 }
 
-                $byStatus[$cell['status']] = $byStatus[$cell['status']] + 1;
-            }
-
-            // Total tahunan memakai semua sel limit yang terisi.
-            foreach ($row['months'] as $cell) {
-                if ($cell['limit'] !== null) {
-                    $totalLimit = Money::add($totalLimit, $cell['limit']);
-                    $totalUsed = Money::add($totalUsed, $cell['used']);
-                }
+                $totalLimit = Money::add($totalLimit, $cell['limit']);
+                $totalUsed = Money::add($totalUsed, $cell['used']);
             }
         }
 

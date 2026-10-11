@@ -5,8 +5,13 @@ export type BudgetCell = {
     month: string;
     /** `null` selama limit bulan ini belum diisi. */
     budget_id: number | null;
-    /** Nominal limit sebagai string desimal, `null` kalau belum diisi. */
+    /**
+     * Limit tampil sebagai string desimal, `null` kalau belum diisi. Untuk
+     * kategori induk, ini gabungan limit induk + seluruh sub-kategorinya.
+     */
     limit: string | null;
+    /** Limit kategori ini sendiri, tanpa sub-kategori. */
+    own_limit: string | null;
     /** Selalu string, bahkan tanpa cache: nol berarti belum ada pemakaian. */
     used: string;
     remaining: string | null;
@@ -19,6 +24,10 @@ export type BudgetRow = {
     id: number;
     name: string;
     color: string | null;
+    /** `null` untuk kategori induk; terisi untuk sub-kategori. */
+    parent_id: number | null;
+    /** `true` bila kategori ini punya sub-kategori (bisa dibuka/tutup). */
+    has_children: boolean;
     is_nested: boolean;
     is_child: boolean;
     months: BudgetCell[];
@@ -62,6 +71,8 @@ export type BudgetFormData = {
     category_id: string;
     month: string;
     limit_amount: string;
+    /** Limit opsional per sub-kategori, dikunci id kategori (string). */
+    sub_limits: Record<string, string>;
 };
 
 export type BudgetDetailCategory = {
