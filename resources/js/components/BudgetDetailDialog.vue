@@ -203,7 +203,7 @@ const percentLabel = computed(() =>
 
 <template>
     <Dialog :open="open" @update:open="emit('update:open', $event)">
-        <DialogContent class="sm:max-w-2xl">
+        <DialogContent class="sm:max-w-3xl">
             <DialogHeader>
                 <DialogTitle>Detail anggaran</DialogTitle>
                 <DialogDescription v-if="detail">
@@ -298,19 +298,19 @@ const percentLabel = computed(() =>
 
                     <ul
                         v-else
-                        class="neu-inset max-h-64 divide-y overflow-y-auto rounded-xl"
+                        class="neu-inset max-h-80 divide-y overflow-y-auto rounded-xl"
                     >
                         <li
                             v-for="transaction in transactions"
                             :key="transaction.id"
-                            class="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                            class="flex items-start justify-between gap-3 px-3 py-2 text-sm"
                         >
                             <div class="min-w-0">
-                                <p class="truncate font-medium">
+                                <p class="font-medium break-words">
                                     {{ transaction.note || 'Tanpa catatan' }}
                                 </p>
                                 <p
-                                    class="truncate text-xs text-muted-foreground"
+                                    class="text-xs break-words text-muted-foreground"
                                 >
                                     {{ formatDate(transaction.occurred_at) }}
                                     <template v-if="transaction.category_name">
@@ -326,7 +326,7 @@ const percentLabel = computed(() =>
                                     </template>
                                 </p>
                             </div>
-                            <span class="shrink-0 font-medium">
+                            <span class="shrink-0 pt-0.5 font-medium">
                                 {{ formatCurrency(transaction.amount) }}
                             </span>
                         </li>
