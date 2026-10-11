@@ -26,6 +26,7 @@ cd "$APP_DIR" || exit 1
 REMOTE="${DEPLOY_REMOTE:-origin}"
 BRANCH="${DEPLOY_BRANCH:-main}"
 CONTAINER="${DEPLOY_CONTAINER:-alfinance_app}"
+QUEUE_CONTAINER="${DEPLOY_QUEUE_CONTAINER:-alfinance_queue}"
 AUTO_PUSH="${AUTO_PUSH:-0}"
 
 STAMP="$APP_DIR/.git/deploy.stamp"      # berisi SHA commit yang terakhir SUKSES di-deploy
@@ -143,6 +144,15 @@ run_cache() {
     docker exec -w /var/www "$CONTAINER" php artisan optimize:clear || return 1
     docker exec -w /var/www "$CONTAINER" php artisan config:cache || return 1
     docker exec -w /var/www "$CONTAINER" php artisan view:cache || return 1
+
+    # Worker Horizon memegang kode & config di memori. Tanpa restart, job
+    # export/backup yang diperbarui tetap memakai kode lama setelah deploy.
+    if [ -n "$(docker ps -q --filter "name=^${QUEUE_CONTAINER}$" 2>/dev/null || true)" ]; then
+        docker exec -w /var/www "$QUEUE_CONTAINER" php artisan horizon:terminate \
+            && log "sinyal restart worker Horizon dikirim" \
+            || log "PERINGATAN: gagal mengirim sinyal restart Horizon"
+    fi
+
     log "cache Laravel di-refresh"
 }
 
