@@ -204,9 +204,14 @@ class SyncDashboardCommand extends Command
             ->selectRaw('MIN(occurred_at) as min_at, MAX(occurred_at) as max_at')
             ->first();
 
-        if ($range !== null && $range->min_at !== null && $range->max_at !== null) {
-            $cursor = CarbonImmutable::parse((string) $range->min_at)->startOfMonth();
-            $last = CarbonImmutable::parse((string) $range->max_at)->startOfMonth();
+        // Kolom agregat di luar skema model, jadi dibaca lewat `getAttribute()`
+        // alih-alih akses properti langsung (agar tetap lolos analisis statis).
+        $minAt = $range?->getAttribute('min_at');
+        $maxAt = $range?->getAttribute('max_at');
+
+        if ($minAt !== null && $maxAt !== null) {
+            $cursor = CarbonImmutable::parse((string) $minAt)->startOfMonth();
+            $last = CarbonImmutable::parse((string) $maxAt)->startOfMonth();
 
             while ($cursor->lessThanOrEqualTo($last)) {
                 $months[] = MonthPeriod::key($cursor);
