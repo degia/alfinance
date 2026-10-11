@@ -153,8 +153,13 @@ Route::middleware(['auth', 'verified', 'workspace.selected'])->group(function ()
     | `budget_progress_cache`, jadi `store`/`update`/`destroy` hanya menulis
     | limit + cache lewat BudgetService (DB transaction) dan butuh ability
     | `editData`.
+    |
+    | `show` adalah "cursor view": ringkasan limit + transaksi mentah yang
+    | memotongnya, dimuat bertahap lewat cursor pagination (ARCHITECTURE.md
+    | §2.1 butir 5). Cukup `view`, jadi Viewer pun boleh membuka detail.
     */
     Route::get('budgets', [BudgetController::class, 'index'])->name('budgets.index');
+    Route::get('budgets/{budget}', [BudgetController::class, 'show'])->name('budgets.show');
     Route::post('budgets', [BudgetController::class, 'store'])->name('budgets.store');
     Route::put('budgets/{budget}', [BudgetController::class, 'update'])->name('budgets.update');
     Route::delete('budgets/{budget}', [BudgetController::class, 'destroy'])->name('budgets.destroy');

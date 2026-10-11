@@ -9,10 +9,12 @@ use App\Jobs\RecomputeBudgetProgressJob;
 use App\Models\Budget;
 use App\Models\BudgetProgress;
 use App\Models\Category;
+use App\Models\Transaction;
 use App\Services\Budgets\BudgetService;
 use App\Support\Money;
 use App\Support\MonthPeriod;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -111,6 +113,122 @@ class BudgetController extends Controller
         ]);
 
         return back();
+    }
+
+    /**
+     * "Cursor view" satu limit: ringkasan + transaksi yang memotong limitnya.
+     *
+     * Angka pemakaian tetap dibaca dari `budget_progress_cache` (sumber
+     * kebenaran halaman anggaran), sedangkan daftar transaksi adalah detail
+     * mentah yang dimuat bertahap dengan cursor pagination — bukan agregasi
+     * ulang di jalur request (ARCHITECTURE.md §2.1 butir 5). Kategori induk
+     * ikut menampilkan transaksi sub-kategorinya, sama seperti cache.
+     */
+    public function show(Budget $budget): JsonResponse
+    {
+        $this->authorizeViewData();
+
+        $workspaceId = (int) $budget->workspace_id;
+        $categoryId = (int) $budget->category_id;
+        $month = CarbonImmutable::parse($budget->month)->startOfMonth();
+        $categoryIds = $this->budgets->rollupFor($workspaceId, $categoryId);
+
+        $transactions = $this->budgets
+            ->spentQuery($workspaceId, $categoryIds, $month)
+            ->with([
+                'account:id,name',
+                'category:id,parent_id,name',
+                'category.parent:id,parent_id,name',
+            ])
+            // Baris terbaru di atas; id sebagai tie-breaker supaya urutan cursor
+            // stabil saat dua transaksi punya tanggal yang sama.
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->cursorPaginate(20);
+
+        $category = Category::query()
+            ->with('parent:id,name')
+            ->findOrFail($categoryId);
+
+        // Baris cache dipasang eksplisit (bukan lewat lazy-load relasi
+        // `progress`) supaya pencocokan bulan tetap benar di semua driver:
+        // kolom `month` bertipe DATE, jadi perbandingan exact string bisa gagal
+        // di SQLite yang menyimpan komponen waktu. Polanya sama dengan
+        // {@see self::categoryRows()}.
+        $budget->setRelation(
+            'progress',
+            BudgetProgress::query()
+                ->where('category_id', $categoryId)
+                ->whereYear('month', $month->year)
+                ->whereMonth('month', $month->month)
+                ->first(),
+        );
+
+        return response()->json([
+            'budget' => $this->presentBudgetDetail(
+                $budget,
+                $month,
+                $category,
+                count($categoryIds) > 1,
+            ),
+            'transactions' => array_map(
+                fn (Transaction $transaction): array => $this->presentSpentTransaction($transaction),
+                $transactions->items(),
+            ),
+            'next_cursor' => $transactions->nextCursor()?->encode(),
+            'has_more' => $transactions->hasMorePages(),
+        ]);
+    }
+
+    /**
+     * Ringkasan limit untuk modal detail.
+     *
+     * @return array<string, mixed>
+     */
+    private function presentBudgetDetail(
+        Budget $budget,
+        CarbonImmutable $month,
+        Category $category,
+        bool $includesSubcategories,
+    ): array {
+        $key = MonthPeriod::key($month);
+
+        return [
+            'id' => (int) $budget->id,
+            'month' => $key,
+            'month_label' => MonthPeriod::label($key),
+            'category' => [
+                'id' => (int) $category->id,
+                'name' => $category->name,
+                'color' => $category->color,
+                'parent_id' => $category->parent_id === null ? null : (int) $category->parent_id,
+                'parent_name' => $category->parent?->name,
+            ],
+            'limit' => $budget->limit_amount,
+            'used' => $budget->usedAmount(),
+            'remaining' => $budget->remaining(),
+            'percent' => $budget->usedPercent(),
+            'status' => $budget->status()->value,
+            'includes_subcategories' => $includesSubcategories,
+        ];
+    }
+
+    /**
+     * Satu baris transaksi yang memotong limit — cukup untuk modal detail.
+     *
+     * @return array<string, mixed>
+     */
+    private function presentSpentTransaction(Transaction $transaction): array
+    {
+        return [
+            'id' => (int) $transaction->id,
+            'occurred_at' => $transaction->occurred_at->toDateString(),
+            'amount' => $transaction->amount,
+            'note' => $transaction->note,
+            'account_name' => $transaction->account?->name,
+            'category_name' => $transaction->category?->name,
+            'category_parent_name' => $transaction->category?->parent?->name,
+        ];
     }
 
     /*

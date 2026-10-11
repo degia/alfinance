@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ChevronLeft, ChevronRight } from '@lucide/vue';
+import BudgetDetailDialog from '@/components/BudgetDetailDialog.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -24,9 +25,15 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { useWorkspace } from '@/composables/useWorkspace';
 import { formatCurrency } from '@/lib/format';
 import { index as budgetsIndex, store as storeBudget } from '@/routes/budgets';
-import type { BudgetFormData, BudgetIndexProps, BudgetStatus } from '@/types';
+import type {
+    BudgetCell,
+    BudgetFormData,
+    BudgetIndexProps,
+    BudgetStatus,
+} from '@/types';
 
 defineOptions({
     layout: {
@@ -37,6 +44,9 @@ defineOptions({
 });
 
 const props = defineProps<BudgetIndexProps>();
+
+const { workspace } = useWorkspace();
+const canEdit = computed(() => workspace.value?.role !== 'viewer');
 
 /**
  * Warna status mengikuti PRD.md §3.5: hijau < 80%, kuning 80–100%, merah > 100%.
@@ -75,6 +85,18 @@ const form = useForm<BudgetFormData>({
     month: props.month,
     limit_amount: '',
 });
+
+const isDetailOpen = ref(false);
+const activeBudgetId = ref<number | null>(null);
+
+function openDetail(cell: BudgetCell): void {
+    if (cell.budget_id === null) {
+        return;
+    }
+
+    activeBudgetId.value = cell.budget_id;
+    isDetailOpen.value = true;
+}
 
 function openCreate(month: string, categoryId?: number): void {
     form.defaults({
@@ -207,6 +229,7 @@ const summaryCards = computed(() => [
                     </div>
 
                     <Button
+                        v-if="canEdit"
                         size="sm"
                         class="gap-2"
                         @click="openCreate(props.month)"
@@ -275,7 +298,56 @@ const summaryCards = computed(() => [
                                     :key="cell.month"
                                     class="px-2 py-2 text-center align-middle"
                                 >
+                                    <button
+                                        v-if="cell.limit !== null"
+                                        type="button"
+                                        class="neu-inset flex min-h-16 w-full flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5"
+                                        :class="
+                                            cell.month === props.month
+                                                ? 'ring-1 ring-primary/40'
+                                                : ''
+                                        "
+                                        :aria-label="`Detail anggaran ${row.name} ${cell.month}`"
+                                        @click="openDetail(cell)"
+                                    >
+                                        <span
+                                            class="text-2xs text-muted-foreground"
+                                        >
+                                            {{ formatCurrency(cell.used) }}
+                                            /{{ formatCurrency(cell.limit) }}
+                                        </span>
+                                        <span
+                                            class="flex h-1.5 w-full overflow-hidden rounded-full bg-muted"
+                                        >
+                                            <span
+                                                class="h-full rounded-full"
+                                                :class="
+                                                    statusTone[cell.status].bar
+                                                "
+                                                :style="{
+                                                    width: `${Math.min(
+                                                        cell.percent ?? 0,
+                                                        100,
+                                                    )}%`,
+                                                }"
+                                            />
+                                        </span>
+                                        <span
+                                            class="text-2xs font-medium"
+                                            :class="
+                                                statusTone[cell.status].text
+                                            "
+                                        >
+                                            {{
+                                                cell.percent === null
+                                                    ? '-'
+                                                    : `${cell.percent}%`
+                                            }}
+                                        </span>
+                                    </button>
+
                                     <div
+                                        v-else
                                         class="neu-inset flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5"
                                         :class="
                                             cell.month === props.month
@@ -283,71 +355,25 @@ const summaryCards = computed(() => [
                                                 : ''
                                         "
                                     >
-                                        <template v-if="cell.limit !== null">
-                                            <span
-                                                class="text-2xs text-muted-foreground"
-                                            >
-                                                {{ formatCurrency(cell.used) }}
-                                                /{{
-                                                    formatCurrency(cell.limit)
-                                                }}
-                                            </span>
-                                            <span
-                                                class="flex h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                                            >
-                                                <span
-                                                    class="h-full rounded-full"
-                                                    :class="
-                                                        statusTone[cell.status]
-                                                            .bar
-                                                    "
-                                                    :style="{
-                                                        width: `${Math.min(
-                                                            cell.percent ?? 0,
-                                                            100,
-                                                        )}%`,
-                                                    }"
-                                                />
-                                            </span>
-                                            <span
-                                                class="text-2xs font-medium"
-                                                :class="
-                                                    statusTone[cell.status].text
-                                                "
-                                            >
-                                                {{
-                                                    cell.percent === null
-                                                        ? '-'
-                                                        : `${cell.percent}%`
-                                                }}
-                                            </span>
-                                        </template>
-
-                                        <template v-else>
-                                            <span
-                                                class="text-2xs text-muted-foreground"
-                                            >
-                                                {{
-                                                    cell.used === '0.00'
-                                                        ? '—'
-                                                        : formatCurrency(
-                                                              cell.used,
-                                                          )
-                                                }}
-                                            </span>
-                                            <button
-                                                type="button"
-                                                class="neu-color rounded text-2xs text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                                                @click="
-                                                    openCreate(
-                                                        cell.month,
-                                                        row.id,
-                                                    )
-                                                "
-                                            >
-                                                + limit
-                                            </button>
-                                        </template>
+                                        <span
+                                            class="text-2xs text-muted-foreground"
+                                        >
+                                            {{
+                                                cell.used === '0.00'
+                                                    ? '—'
+                                                    : formatCurrency(cell.used)
+                                            }}
+                                        </span>
+                                        <button
+                                            v-if="canEdit"
+                                            type="button"
+                                            class="neu-color rounded text-2xs text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                            @click="
+                                                openCreate(cell.month, row.id)
+                                            "
+                                        >
+                                            + limit
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -434,5 +460,11 @@ const summaryCards = computed(() => [
                 </form>
             </DialogContent>
         </Dialog>
+
+        <BudgetDetailDialog
+            v-model:open="isDetailOpen"
+            :budget-id="activeBudgetId"
+            :can-edit="canEdit"
+        />
     </div>
 </template>

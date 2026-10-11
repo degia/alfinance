@@ -63,3 +63,49 @@ export type BudgetFormData = {
     month: string;
     limit_amount: string;
 };
+
+export type BudgetDetailCategory = {
+    id: number;
+    name: string;
+    color: string | null;
+    parent_id: number | null;
+    parent_name: string | null;
+};
+
+/**
+ * Ringkasan limit di modal detail ("cursor view").
+ */
+export type BudgetDetail = {
+    id: number;
+    month: string;
+    month_label: string;
+    category: BudgetDetailCategory;
+    limit: string;
+    used: string;
+    remaining: string;
+    percent: number | null;
+    status: BudgetStatus;
+    /** `true` bila limit induk ikut menghitung transaksi sub-kategorinya. */
+    includes_subcategories: boolean;
+};
+
+/**
+ * Satu transaksi yang memotong limit — cukup untuk daftar di modal detail.
+ */
+export type BudgetDetailTransaction = {
+    id: number;
+    occurred_at: string;
+    amount: string;
+    note: string | null;
+    account_name: string | null;
+    category_name: string | null;
+    category_parent_name: string | null;
+};
+
+export type BudgetDetailResponse = {
+    budget: BudgetDetail;
+    transactions: BudgetDetailTransaction[];
+    /** Cursor halaman berikutnya, `null` bila sudah habis. */
+    next_cursor: string | null;
+    has_more: boolean;
+};

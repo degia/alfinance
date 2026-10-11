@@ -12,6 +12,7 @@ use App\Models\Transaction;
 use App\Support\Money;
 use App\Support\MonthPeriod;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -211,17 +212,35 @@ class BudgetService
             return '0.00';
         }
 
+        $total = $this->spentQuery($workspaceId, $categoryIds, $month)->sum('amount');
+
+        return Money::atLeastZero(Money::fromDatabaseSum($total));
+    }
+
+    /**
+     * Query transaksi mentah yang memotong limit satu kategori + sub-kategorinya.
+     *
+     * Batasannya sengaja identik dengan {@see self::spentFor()} supaya jumlah
+     * baris yang muncul di "cursor view" persis sama dengan angka cache:
+     * posted expense, kategori (induk + sub), dalam rentang bulan.
+     *
+     * Dipakai halaman anggaran saat user memang butuh detail mentah
+     * (ARCHITECTURE.md §2.1 butir 5): dijalankan on-demand dan sudah difilter
+     * kecil, jadi boleh menyentuh `transactions` langsung — bukan lewat cache.
+     *
+     * @param  array<int, int>  $categoryIds
+     * @return Builder<Transaction>
+     */
+    public function spentQuery(int $workspaceId, array $categoryIds, CarbonImmutable $month): Builder
+    {
         [$from, $to] = MonthPeriod::bounds($month);
 
-        $total = Transaction::allWorkspaces()
+        return Transaction::allWorkspaces()
             ->where('workspace_id', $workspaceId)
             ->whereIn('category_id', $categoryIds)
             ->posted()
             ->ofType(TransactionType::Expense)
-            ->occurredBetween($from->toDateString(), $to->toDateString())
-            ->sum('amount');
-
-        return Money::atLeastZero(Money::fromDatabaseSum($total));
+            ->occurredBetween($from->toDateString(), $to->toDateString());
     }
 
     /**

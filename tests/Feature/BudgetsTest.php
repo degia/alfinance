@@ -489,6 +489,134 @@ class BudgetsTest extends TestCase
             ->assertInertia(fn ($page) => $page->where('month', '2026-03'));
     }
 
+    public function test_the_budget_detail_lists_only_the_transactions_that_count(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+        $account = Account::factory()->forWorkspace($workspace)->cash()->create();
+        $other = Category::factory()->forWorkspace($workspace)->create();
+
+        $parent = Category::factory()->forWorkspace($workspace)->create(['name' => 'Kebutuhan Pokok']);
+        $child = Category::factory()->forWorkspace($workspace)->childOf($parent)->create(['name' => 'Sayur']);
+
+        $budget = $this->budgetFor($workspace, $parent, '2026-09', '1000000.00');
+
+        // Dipotong: posted expense di subtree kategori induk.
+        Transaction::factory()->forWorkspace($workspace)->from($account)
+            ->expense('150000.00')->for($child)->on('2026-09-03')->create(['note' => 'Sayur']);
+        Transaction::factory()->forWorkspace($workspace)->from($account)
+            ->expense('100000.00')->for($parent)->on('2026-09-04')->create(['note' => 'Beras']);
+
+        // Tidak dipotong: income, pending, kategori lain, dan bulan lain.
+        Transaction::factory()->forWorkspace($workspace)->from($account)
+            ->income('500000.00')->for($parent)->on('2026-09-05')->create();
+        Transaction::factory()->forWorkspace($workspace)->from($account)
+            ->expense('900000.00')->for($parent)->on('2026-09-06')->pending()->create();
+        Transaction::factory()->forWorkspace($workspace)->from($account)
+            ->expense('300000.00')->for($other)->on('2026-09-07')->create();
+        Transaction::factory()->forWorkspace($workspace)->from($account)
+            ->expense('700000.00')->for($parent)->on('2026-10-01')->create();
+
+        $this->refreshProgress($workspace, '2026-09');
+
+        $this->getJson(route('budgets.show', $budget))
+            ->assertOk()
+            ->assertJsonCount(2, 'transactions')
+            ->assertJsonPath('budget.limit', '1000000.00')
+            ->assertJsonPath('budget.used', '250000.00')
+            ->assertJsonPath('budget.category.name', 'Kebutuhan Pokok')
+            ->assertJsonPath('budget.includes_subcategories', true)
+            ->assertJsonPath('has_more', false)
+            // Terbaru di atas, dan sub-kategori ikut membawa nama induknya.
+            ->assertJsonPath('transactions.0.note', 'Beras')
+            ->assertJsonPath('transactions.0.amount', '100000.00')
+            ->assertJsonPath('transactions.1.note', 'Sayur')
+            ->assertJsonPath('transactions.1.category_name', 'Sayur')
+            ->assertJsonPath('transactions.1.category_parent_name', 'Kebutuhan Pokok');
+    }
+
+    public function test_the_budget_detail_is_cursor_paginated(): void
+    {
+        $user = $this->signedIn();
+        $workspace = $user->workspaces()->sole();
+        $account = Account::factory()->forWorkspace($workspace)->cash()->create();
+        $category = Category::factory()->forWorkspace($workspace)->create();
+
+        $budget = $this->budgetFor($workspace, $category, '2026-09', '999999999.00');
+
+        for ($day = 1; $day <= 25; $day++) {
+            Transaction::factory()->forWorkspace($workspace)->from($account)
+                ->expense('10000.00')->for($category)
+                ->on('2026-09-'.str_pad((string) $day, 2, '0', STR_PAD_LEFT))
+                ->create();
+        }
+
+        $this->refreshProgress($workspace, '2026-09');
+
+        $first = $this->getJson(route('budgets.show', $budget))
+            ->assertOk()
+            ->assertJsonCount(20, 'transactions')
+            ->assertJsonPath('has_more', true)
+            ->json();
+
+        $this->assertNotNull($first['next_cursor']);
+
+        $second = $this->getJson(route('budgets.show', $budget).'?cursor='.urlencode($first['next_cursor']))
+            ->assertOk()
+            ->assertJsonCount(5, 'transactions')
+            ->assertJsonPath('has_more', false)
+            ->json();
+
+        $this->assertNull($second['next_cursor']);
+
+        $ids = array_merge(
+            array_column($first['transactions'], 'id'),
+            array_column($second['transactions'], 'id'),
+        );
+
+        $this->assertCount(25, array_unique($ids), 'Cursor pagination tidak boleh mengulang atau melewatkan baris.');
+    }
+
+    public function test_a_budget_of_another_workspace_is_not_accessible(): void
+    {
+        $this->signedIn();
+
+        $otherWorkspace = Workspace::factory()->create();
+        $budget = Budget::factory()
+            ->forWorkspace($otherWorkspace)
+            ->forCategory(Category::factory()->forWorkspace($otherWorkspace)->create())
+            ->forMonth('2026-09')
+            ->create();
+
+        $this->getJson(route('budgets.show', $budget))->assertNotFound();
+    }
+
+    public function test_guests_cannot_view_a_budget_detail(): void
+    {
+        $workspace = Workspace::factory()->create();
+        $budget = Budget::factory()
+            ->forWorkspace($workspace)
+            ->forCategory(Category::factory()->forWorkspace($workspace)->create())
+            ->forMonth('2026-09')
+            ->create();
+
+        $this->get(route('budgets.show', $budget))->assertRedirect(route('login'));
+    }
+
+    public function test_viewers_can_view_a_budget_detail(): void
+    {
+        $viewer = $this->signedInAs(WorkspaceRole::Viewer);
+        $workspace = $viewer->workspaces()->sole();
+        $budget = $this->budgetFor(
+            $workspace,
+            Category::factory()->forWorkspace($workspace)->create(),
+            '2026-09',
+            '500000.00',
+        );
+
+        $this->getJson(route('budgets.show', $budget))->assertOk();
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Helper
