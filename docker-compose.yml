@@ -1,60 +1,38 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
+    image: alfinance-app
     container_name: alfinance_app
     restart: always
     volumes:
       - .:/var/www
-    environment:
-      - DB_HOST=192.168.20.5
-      - DB_PORT=3308
-      - DB_DATABASE=alfinance
-      - DB_USERNAME=dev
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    networks:
-      - alfinance_net
-
-  queue:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: alfinance_queue
-    restart: always
-    command: php artisan horizon
-    volumes:
-      - .:/var/www
-    environment:
-      - DB_HOST=192.168.20.5
-      - DB_PORT=3308
-      - DB_DATABASE=alfinance
-      - DB_USERNAME=dev
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
     depends_on:
       - redis
     networks:
       - alfinance_net
 
+  queue:
+    image: alfinance-app
+    container_name: alfinance_queue
+    restart: always
+    command: php artisan horizon
+    volumes:
+      - .:/var/www
+    depends_on:
+      - app
+      - redis
+    networks:
+      - alfinance_net
+
   scheduler:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: alfinance-app
     container_name: alfinance_scheduler
     restart: always
     command: php artisan schedule:work
     volumes:
       - .:/var/www
-    environment:
-      - DB_HOST=192.168.20.5
-      - DB_PORT=3308
-      - DB_DATABASE=alfinance
-      - DB_USERNAME=dev
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
     depends_on:
+      - app
       - redis
     networks:
       - alfinance_net
@@ -63,8 +41,6 @@ services:
     image: redis:alpine
     container_name: alfinance_redis
     restart: always
-    ports:
-      - "6379:6379"
     networks:
       - alfinance_net
 
@@ -73,7 +49,7 @@ services:
     container_name: alfinance_nginx
     restart: always
     ports:
-      - "80:80"
+      - "8087:80"
     volumes:
       - .:/var/www
       - ./nginx/conf.d:/etc/nginx/conf.d
