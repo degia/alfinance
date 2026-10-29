@@ -194,13 +194,32 @@ class ExportsBackupsTest extends TestCase
         $source = $this->signedIn();
         $sourceWorkspace = $source->workspaces()->sole();
         $sourceAccount = Account::factory()->forWorkspace($sourceWorkspace)->cash()->create();
-        Transaction::factory()->count(2)->from($sourceAccount)->create();
+        Transaction::factory()->count(2)->from($sourceAccount)->create([
+            'created_by' => $source->id,
+            'updated_by' => $source->id,
+        ]);
 
         $this->post(route('backups.store'), ['scope' => BackupScope::Full->value]);
         $sourceBackup = Backup::query()->sole();
         $this->assertSame(BackupStatus::Done, $sourceBackup->status, (string) $sourceBackup->error);
 
-        $json = Storage::disk('backups')->get((string) $sourceBackup->file_path);
+        $payload = json_decode(
+            Storage::disk('backups')->get((string) $sourceBackup->file_path),
+            true,
+        );
+
+        // `created_by`/`updated_by` diarahkan ke id user yang dijamin tidak
+        // pernah ada di database tujuan — mensimulasikan backup dari
+        // instance lain yang user-nya tidak dikenal di sini.
+        $unknownUserId = $source->id + 999_000;
+
+        foreach ($payload['transactions'] as &$transactionRow) {
+            $transactionRow['created_by'] = $unknownUserId;
+            $transactionRow['updated_by'] = $unknownUserId;
+        }
+        unset($transactionRow);
+
+        $json = json_encode($payload, JSON_THROW_ON_ERROR);
 
         // Baris sumber dihapus supaya id-nya bebas — mensimulasikan backup
         // yang berasal dari instance lain, bukan id yang masih dipakai di
@@ -230,6 +249,12 @@ class ExportsBackupsTest extends TestCase
             2,
             DB::table('transactions')->where('workspace_id', $targetWorkspace->id)->count(),
         );
+
+        // User yang tercatat di backup tidak ada di database tujuan →
+        // created_by/updated_by dikosongkan, bukan membuat restore gagal
+        // dengan pelanggaran foreign key.
+        $restored = DB::table('transactions')->where('workspace_id', $targetWorkspace->id)->get();
+        $this->assertTrue($restored->every(fn ($row) => $row->created_by === null && $row->updated_by === null));
     }
 
     public function test_invalid_backup_file_is_rejected_on_import(): void

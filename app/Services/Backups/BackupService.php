@@ -40,6 +40,23 @@ final class BackupService
     public const SCHEMA_VERSION = 1;
 
     /**
+     * Kolom yang mereferensikan `users.id` (nullable, `nullOnDelete`) pada
+     * bagian payload yang dibackup. Dipakai saat restore untuk menghapus
+     * referensi ke user yang tidak ada di database tujuan — baik karena
+     * sudah dihapus, maupun karena backup diimpor dari workspace/instance
+     * lain yang id user-nya tidak pernah ada di sini.
+     *
+     * @var array<string, list<string>>
+     */
+    private const USER_REFERENCE_COLUMNS = [
+        'transactions' => ['created_by', 'updated_by'],
+        'budgets' => ['created_by', 'updated_by'],
+        'net_worth_items' => ['created_by', 'updated_by'],
+        'debts' => ['created_by', 'updated_by'],
+        'debt_payments' => ['created_by'],
+    ];
+
+    /**
      * Bagian payload yang dibackup, dalam urutan ketergantungan FK.
      *
      * @var array<string, string>
@@ -307,12 +324,14 @@ final class BackupService
             throw new RuntimeException('Payload backup tidak memuat workspace_id.');
         }
 
+        $validUserIds = $this->existingUserIds($payload);
+
         try {
-            DB::transaction(function () use ($payload, $workspaceId): void {
+            DB::transaction(function () use ($payload, $workspaceId, $validUserIds): void {
                 $this->restoreWorkspaceRow($payload, $workspaceId);
 
                 foreach (self::TABLES as $key => $table) {
-                    $this->restoreTable($table, $workspaceId, $payload[$key] ?? []);
+                    $this->restoreTable($table, $workspaceId, $payload[$key] ?? [], $validUserIds);
                 }
 
                 $this->restorePivotRows($payload);
@@ -624,10 +643,54 @@ final class BackupService
     }
 
     /**
-     * @param  array<int, mixed>  $rows
+     * Kumpulkan id user yang benar-benar ada di database tujuan dari seluruh
+     * referensi `created_by`/`updated_by` pada payload, dalam satu query per
+     * tabel user. Backup bisa saja merujuk user yang sudah dihapus, atau
+     * (untuk backup impor) user yang tidak pernah ada di instance ini.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<int, true>
      */
-    private function restoreTable(string $table, int $workspaceId, array $rows): void
+    private function existingUserIds(array $payload): array
     {
+        $ids = [];
+
+        foreach (self::USER_REFERENCE_COLUMNS as $key => $columns) {
+            /** @var array<int, mixed> $rows */
+            $rows = $payload[$key] ?? [];
+
+            foreach ($rows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                foreach ($columns as $column) {
+                    if (isset($row[$column]) && is_numeric($row[$column])) {
+                        $ids[(int) $row[$column]] = true;
+                    }
+                }
+            }
+        }
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return DB::table('users')
+            ->whereIn('id', array_keys($ids))
+            ->pluck('id')
+            ->mapWithKeys(static fn (int|string $id): array => [(int) $id => true])
+            ->all();
+    }
+
+    /**
+     * @param  array<int, mixed>  $rows
+     * @param  array<int, true>  $validUserIds
+     */
+    private function restoreTable(string $table, int $workspaceId, array $rows, array $validUserIds): void
+    {
+        $userColumns = self::USER_REFERENCE_COLUMNS[$table] ?? [];
+
         foreach ($rows as $row) {
             if (! is_array($row) || ! isset($row['id'])) {
                 continue;
@@ -637,6 +700,12 @@ final class BackupService
 
             if ($id < 1) {
                 continue;
+            }
+
+            foreach ($userColumns as $column) {
+                if (isset($row[$column]) && ! isset($validUserIds[(int) $row[$column]])) {
+                    $row[$column] = null;
+                }
             }
 
             $existing = DB::table($table)->where('id', $id)->first();
