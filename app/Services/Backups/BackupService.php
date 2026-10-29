@@ -2,6 +2,8 @@
 
 namespace App\Services\Backups;
 
+use App\Enums\BackupScope;
+use App\Enums\BackupStatus;
 use App\Jobs\GenerateNetWorthSnapshotJob;
 use App\Jobs\RecomputeBudgetProgressJob;
 use App\Jobs\RecomputeDashboardSnapshotJob;
@@ -10,6 +12,7 @@ use App\Models\Backup;
 use App\Services\Cache\WorkspaceCache;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use JsonException;
@@ -140,6 +143,88 @@ final class BackupService
         $payload['summary'] = $summary;
 
         return $payload;
+    }
+
+    /**
+     * Impor berkas backup JSON dari luar (mis. hasil ekspor instance/workspace
+     * lain) sebagai baris `backups` baru milik workspace aktif.
+     *
+     * Berkas divalidasi dulu, lalu `meta.workspace_id` ditulis ulang ke
+     * workspace aktif sehingga {@see preview()} dan {@see restore()} bisa
+     * dipakai apa adanya: `workspace_id` tiap baris sudah ditimpa oleh
+     * `restoreTable()` saat insert/update, jadi nilai asal di payload tidak
+     * berpengaruh. Baris yang id-nya bentrok dengan milik workspace lain
+     * tetap dilewati seperti restore biasa (dilaporkan di dry-run diff).
+     */
+    public function import(int $workspaceId, ?int $userId, UploadedFile $file): Backup
+    {
+        $raw = $file->get();
+
+        try {
+            $payload = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new RuntimeException('Berkas yang diunggah bukan JSON yang valid.', 0, $exception);
+        }
+
+        if (! is_array($payload)) {
+            throw new RuntimeException('Isi berkas bukan objek JSON backup.');
+        }
+
+        $errors = $this->validatePayload($payload);
+
+        if ($errors !== []) {
+            throw new RuntimeException('Backup tidak valid: '.implode(' ', $errors));
+        }
+
+        /** @var array<string, mixed> $meta */
+        $meta = $payload['meta'];
+        $meta['workspace_id'] = $workspaceId;
+        $meta['imported_at'] = CarbonImmutable::now()->toIso8601String();
+        $payload['meta'] = $meta;
+
+        $scope = BackupScope::tryFrom((string) ($meta['scope'] ?? '')) ?? BackupScope::Full;
+        $range = is_array($meta['range'] ?? null) ? $meta['range'] : null;
+
+        $summary = [];
+
+        foreach (self::TABLES as $key => $table) {
+            $summary[$key] = is_array($payload[$key] ?? null) ? count($payload[$key]) : 0;
+        }
+
+        $summary['transaction_tag'] = is_array($payload['transaction_tag'] ?? null)
+            ? count($payload['transaction_tag'])
+            : 0;
+
+        $payload['summary'] = $summary;
+
+        $json = json_encode(
+            $payload,
+            JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+        );
+
+        $name = sprintf('backup-%d-import-%s.json', $workspaceId, CarbonImmutable::now()->format('Ymd-His'));
+        $path = $workspaceId.'/'.$name;
+
+        $disk = Storage::disk('backups');
+
+        if (! $disk->put($path, $json)) {
+            throw new RuntimeException('File backup yang diimpor tidak bisa ditulis ke storage.');
+        }
+
+        $backup = new Backup([
+            'workspace_id' => $workspaceId,
+            'user_id' => $userId,
+            'scope' => $scope,
+            'status' => BackupStatus::Queued,
+            'schema_version' => self::SCHEMA_VERSION,
+            'from' => $scope->needsRange() && is_array($range) ? ($range['from'] ?? null) : null,
+            'to' => $scope->needsRange() && is_array($range) ? ($range['to'] ?? null) : null,
+        ]);
+
+        $backup->save();
+        $backup->markDone($path, $file->getClientOriginalName() ?: $name, strlen($json), $summary);
+
+        return $backup;
     }
 
     /*

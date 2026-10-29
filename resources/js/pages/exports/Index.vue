@@ -9,6 +9,7 @@ import {
     History,
     RotateCcw,
     Trash2,
+    Upload,
 } from '@lucide/vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
@@ -42,6 +43,7 @@ import {
 } from '@/routes/exports';
 import {
     download as downloadBackup,
+    importBackup,
     preview as previewBackup,
     restore as restoreBackup,
     store as storeBackup,
@@ -142,6 +144,35 @@ const backupForm = useForm({
     from: '',
     to: '',
 });
+
+const importForm = useForm<{ file: File | null }>({
+    file: null,
+});
+
+const importFileInput = ref<HTMLInputElement | null>(null);
+
+function onImportFileChange(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    importForm.file = target.files?.[0] ?? null;
+}
+
+function submitImport(): void {
+    if (importForm.file === null) {
+        return;
+    }
+
+    importForm.post(importBackup().url, {
+        preserveScroll: true,
+        forceFormData: true,
+        onSuccess: () => {
+            importForm.reset('file');
+
+            if (importFileInput.value) {
+                importFileInput.value.value = '';
+            }
+        },
+    });
+}
 
 function submitExport(): void {
     exportForm
@@ -699,6 +730,51 @@ function isPendingRow(row: ExportRow): boolean {
                 </CardContent>
             </Card>
         </div>
+
+        <Card class="rounded-2xl border-0 shadow-neu-flat">
+            <CardContent class="flex flex-col gap-4">
+                <div class="flex items-center gap-2">
+                    <Upload class="size-4 text-muted-foreground" />
+                    <h2 class="text-sm font-semibold">Impor backup</h2>
+                </div>
+
+                <p class="text-xs text-muted-foreground">
+                    Unggah berkas JSON backup dari workspace atau instance
+                    lain. Setelah diimpor, jalankan pratinjau dulu di riwayat
+                    backup di bawah sebelum memulihkannya ke workspace ini.
+                </p>
+
+                <form class="grid gap-4" @submit.prevent="submitImport">
+                    <div class="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                        <div class="grid gap-2">
+                            <Label for="import-file">Berkas backup (.json)</Label>
+                            <input
+                                id="import-file"
+                                ref="importFileInput"
+                                type="file"
+                                class="text-xs"
+                                accept="application/json,.json"
+                                @change="onImportFileChange"
+                            />
+                            <InputError :message="importForm.errors.file" />
+                        </div>
+
+                        <Button
+                            type="submit"
+                            :disabled="
+                                !canEdit ||
+                                importForm.processing ||
+                                importForm.file === null
+                            "
+                        >
+                            <Spinner v-if="importForm.processing" />
+                            <Upload v-else class="size-4" />
+                            Impor backup
+                        </Button>
+                    </div>
+                </form>
+            </CardContent>
+        </Card>
 
         <Card class="rounded-2xl border-0 py-0 shadow-neu-flat">
             <CardContent class="p-0">

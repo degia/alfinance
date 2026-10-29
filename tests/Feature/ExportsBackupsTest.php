@@ -15,6 +15,7 @@ use App\Models\ExportJob;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -182,6 +183,67 @@ class ExportsBackupsTest extends TestCase
 
         $this->assertSame(BackupStatus::Done, $backup->status, (string) $backup->error);
         $this->assertSame(1, $backup->summary['transactions'] ?? null);
+    }
+
+    public function test_backup_can_be_imported_from_another_workspace_and_restored(): void
+    {
+        Storage::fake('backups');
+
+        // Workspace sumber: buat backup penuh berisi 2 transaksi, lalu unduh
+        // isinya sebagai berkas JSON (seolah diunduh dari instance lain).
+        $source = $this->signedIn();
+        $sourceWorkspace = $source->workspaces()->sole();
+        $sourceAccount = Account::factory()->forWorkspace($sourceWorkspace)->cash()->create();
+        Transaction::factory()->count(2)->from($sourceAccount)->create();
+
+        $this->post(route('backups.store'), ['scope' => BackupScope::Full->value]);
+        $sourceBackup = Backup::query()->sole();
+        $this->assertSame(BackupStatus::Done, $sourceBackup->status, (string) $sourceBackup->error);
+
+        $json = Storage::disk('backups')->get((string) $sourceBackup->file_path);
+
+        // Baris sumber dihapus supaya id-nya bebas — mensimulasikan backup
+        // yang berasal dari instance lain, bukan id yang masih dipakai di
+        // database yang sama.
+        DB::table('transactions')->delete();
+        DB::table('accounts')->delete();
+
+        // Workspace tujuan: impor berkas tadi, lalu pulihkan ke workspace ini.
+        $target = $this->signedIn();
+        $targetWorkspace = $target->workspaces()->sole();
+
+        $file = UploadedFile::fake()->createWithContent('backup.json', $json);
+
+        $this->post(route('backups.importBackup'), ['file' => $file])
+            ->assertRedirect();
+
+        $imported = Backup::query()->where('workspace_id', $targetWorkspace->id)->sole();
+
+        $this->assertSame(BackupStatus::Done, $imported->status, (string) $imported->error);
+        $this->assertSame(2, $imported->summary['transactions'] ?? null);
+
+        $this->post(route('backups.preview', $imported))->assertRedirect();
+        $this->post(route('backups.restore', $imported))->assertRedirect();
+
+        $this->assertDatabaseHas('transactions', ['workspace_id' => $targetWorkspace->id]);
+        $this->assertSame(
+            2,
+            DB::table('transactions')->where('workspace_id', $targetWorkspace->id)->count(),
+        );
+    }
+
+    public function test_invalid_backup_file_is_rejected_on_import(): void
+    {
+        Storage::fake('backups');
+
+        $this->signedIn();
+
+        $file = UploadedFile::fake()->createWithContent('backup.json', '{"not":"a backup"}');
+
+        $this->post(route('backups.importBackup'), ['file' => $file])
+            ->assertRedirect();
+
+        $this->assertSame(0, Backup::query()->count());
     }
 
     private function signedIn(): User

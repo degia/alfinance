@@ -85,6 +85,7 @@ Route::middleware(['auth', 'verified', 'workspace.selected'])->group(function ()
     Route::get('exports/{export_job}/download', [ExportController::class, 'download'])->name('exports.download');
 
     Route::post('backups', [BackupController::class, 'store'])->middleware('throttle:backups')->name('backups.store');
+    Route::post('backups/import', [BackupController::class, 'importBackup'])->middleware('throttle:backups')->name('backups.importBackup');
     Route::post('backups/{backup}/preview', [BackupController::class, 'preview'])->middleware('throttle:backups')->name('backups.preview');
     Route::post('backups/{backup}/restore', [BackupController::class, 'restore'])->middleware('throttle:backups.restore')->name('backups.restore');
     Route::get('backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
