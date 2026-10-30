@@ -6,14 +6,20 @@
 #   1. Git hooks (post-commit / post-merge / post-checkout) → perubahan lokal langsung ter-deploy
 #   2. Cron tiap 1 menit → narik commit terbaru dari GitHub (update dari mesin lain)
 #
-# Yang dilakukan:
+# Image sekarang self-contained (kode + vendor + aset Vite di-bake langsung
+# oleh `docker build`, lihat Dockerfile) — jadi tidak ada lagi `npm run
+# build`/`composer install`/`artisan cache` manual di host. Yang dilakukan
+# skrip ini kalau ada file relevan yang berubah:
 #   - git pull --ff-only (hanya jika working tree bersih)
-#   - npm ci + npm run build   → hanya jika file frontend berubah
-#   - artisan optimize:clear / config:cache / view:cache → hanya jika file PHP / .env berubah
+#   - docker compose build app   (composer install + npm build terjadi di
+#     dalam image)
+#   - docker compose up -d app queue scheduler   (container baru otomatis
+#     memuat kode baru; `config:cache`/`view:cache` dijalankan sendiri oleh
+#     `docker/entrypoint.sh` saat container start)
+#   - artisan migrate --force   (hanya jika ada migration baru)
 #
-# Deteksi perubahan pakai state git (commit terakhir yang sukses di-deploy + file
-# yang belum di-commit), BUKAN mtime — jadi file hasil build (public/build,
-# resources/js/routes, bootstrap/cache, storage) tidak pernah memicu deploy berulang.
+# Deteksi perubahan pakai state git (commit terakhir yang sukses di-deploy +
+# file yang belum di-commit), BUKAN mtime.
 #
 # Variabel environment (opsional):
 #   DEPLOY_REMOTE=origin  DEPLOY_BRANCH=main  DEPLOY_CONTAINER=alfinance_app  AUTO_PUSH=0|1
@@ -26,7 +32,6 @@ cd "$APP_DIR" || exit 1
 REMOTE="${DEPLOY_REMOTE:-origin}"
 BRANCH="${DEPLOY_BRANCH:-main}"
 CONTAINER="${DEPLOY_CONTAINER:-alfinance_app}"
-QUEUE_CONTAINER="${DEPLOY_QUEUE_CONTAINER:-alfinance_queue}"
 AUTO_PUSH="${AUTO_PUSH:-0}"
 
 STAMP="$APP_DIR/.git/deploy.stamp"      # berisi SHA commit yang terakhir SUKSES di-deploy
@@ -89,13 +94,13 @@ fi
 
 # --------------------------------------------------------------- 4. deteksi perubahan
 NEED_BUILD=0
-NEED_CACHE=0
+NEED_MIGRATE=0
 
 LAST_HEAD="$(cat "$STAMP" 2>/dev/null || true)"
 if [ -z "$LAST_HEAD" ] || ! git cat-file -e "${LAST_HEAD}^{commit}" 2>/dev/null; then
     NEED_BUILD=1
-    NEED_CACHE=1
-    log "deploy pertama → build aset + refresh cache penuh"
+    NEED_MIGRATE=1
+    log "deploy pertama → build image penuh + migrasi"
 else
     # sejak deploy terakhir: commit baru + perubahan belum di-commit + file baru
     CHANGED="$({
@@ -107,58 +112,40 @@ else
     while IFS= read -r f; do
         [ -n "$f" ] || continue
         case "$f" in
-            resources/js/*|resources/css/*|package.json|package-lock.json|vite.config.ts|tsconfig.json|components.json|.npmrc|pnpm-workspace.yaml)
-                if [ "$NEED_BUILD" = 0 ]; then NEED_BUILD=1; log "file frontend berubah → build aset (contoh: $f)"; fi ;;
+            app/*|bootstrap/*|config/*|database/*|routes/*|resources/*|public/*|composer.json|composer.lock|package.json|package-lock.json|vite.config.ts|tsconfig.json|components.json|.npmrc|pnpm-workspace.yaml|Dockerfile|docker/*|nginx/*|artisan)
+                if [ "$NEED_BUILD" = 0 ]; then NEED_BUILD=1; log "file aplikasi berubah → build ulang image (contoh: $f)"; fi ;;
         esac
         case "$f" in
-            app/*|bootstrap/*|config/*|database/*|routes/*|resources/views/*|public/index.php|composer.json|composer.lock|artisan)
-                if [ "$NEED_CACHE" = 0 ]; then NEED_CACHE=1; log "file PHP berubah → refresh cache Laravel (contoh: $f)"; fi ;;
+            database/migrations/*)
+                if [ "$NEED_MIGRATE" = 0 ]; then NEED_MIGRATE=1; log "ada migration baru → migrate (contoh: $f)"; fi ;;
         esac
     done <<< "$CHANGED"
-
-    # .env tidak di-track git → dicek lewat waktu ubah
-    if [ -f .env ] && [ .env -nt "$STAMP" ] && [ "$NEED_CACHE" = 0 ]; then
-        NEED_CACHE=1
-        log ".env berubah → refresh cache Laravel"
-    fi
 fi
 
 [ "$PULLED" = 1 ] && log "ada code baru dari GitHub"
 
 # ------------------------------------------------------------------- 5. eksekusi
 run_build() {
-    log "npm install & build ..."
-    if [ ! -d node_modules ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then
-        npm ci --no-audit --no-fund || return 1
-    fi
-    npm run build || return 1
-    log "build aset selesai"
+    log "docker compose build app ..."
+    docker compose build app || return 1
+    log "docker compose up -d app queue scheduler ..."
+    docker compose up -d app queue scheduler || return 1
+    log "build & restart selesai"
 }
 
-run_cache() {
-    if [ -z "$CONTAINER_STATE" ]; then
-        log "container $CONTAINER tidak berjalan → refresh cache dilewati"
+run_migrate() {
+    if [ -z "$(docker ps -q --filter "name=^${CONTAINER}$" 2>/dev/null || true)" ]; then
+        log "container $CONTAINER tidak berjalan → migrasi dilewati"
         return 1
     fi
-    log "artisan optimize:clear / config:cache / view:cache"
-    docker exec -w /var/www "$CONTAINER" php artisan optimize:clear || return 1
-    docker exec -w /var/www "$CONTAINER" php artisan config:cache || return 1
-    docker exec -w /var/www "$CONTAINER" php artisan view:cache || return 1
-
-    # Worker Horizon memegang kode & config di memori. Tanpa restart, job
-    # export/backup yang diperbarui tetap memakai kode lama setelah deploy.
-    if [ -n "$(docker ps -q --filter "name=^${QUEUE_CONTAINER}$" 2>/dev/null || true)" ]; then
-        docker exec -w /var/www "$QUEUE_CONTAINER" php artisan horizon:terminate \
-            && log "sinyal restart worker Horizon dikirim" \
-            || log "PERINGATAN: gagal mengirim sinyal restart Horizon"
-    fi
-
-    log "cache Laravel di-refresh"
+    log "artisan migrate --force"
+    docker exec -w /var/www "$CONTAINER" php artisan migrate --force || return 1
+    log "migrasi selesai"
 }
 
 main() {
     if [ "$NEED_BUILD" = 1 ]; then run_build || return 1; fi
-    if [ "$NEED_CACHE" = 1 ]; then run_cache || return 1; fi
+    if [ "$NEED_MIGRATE" = 1 ]; then run_migrate || return 1; fi
     return 0
 }
 
@@ -166,7 +153,7 @@ if main; then
     printf '%s\n' "$(git rev-parse HEAD)" > "$STAMP"
     touch "$STAMP"
     rm -f "$FAILED"
-    log "deploy selesai (build=$NEED_BUILD cache=$NEED_CACHE pull=$PULLED)"
+    log "deploy selesai (build=$NEED_BUILD migrate=$NEED_MIGRATE pull=$PULLED)"
 else
     printf '%s\n' "$SIG" > "$FAILED"
     log "deploy GAGAL → lihat pesan di atas"

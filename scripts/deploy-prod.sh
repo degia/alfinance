@@ -2,9 +2,13 @@
 #
 # deploy-prod.sh — Update Alfinance production (Docker) dengan satu perintah
 #
+# Image sekarang self-contained (kode + vendor + aset Vite di-bake langsung
+# oleh `docker build`, lihat Dockerfile), jadi deploy = build ulang image +
+# migrasi + restart, tidak ada lagi `composer install`/`npm run build` manual
+# di host.
+#
 # Pemakaian:
 #   ./scripts/deploy-prod.sh              # deploy normal
-#   ./scripts/deploy-prod.sh --no-build   # lewati build frontend (jika hanya ubah PHP)
 #
 set -euo pipefail
 
@@ -12,9 +16,6 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$APP_DIR"
 
 BRANCH="${DEPLOY_BRANCH:-main}"
-NODE_IMAGE="${NODE_IMAGE:-node:22}"
-SKIP_BUILD=0
-[ "${1:-}" = "--no-build" ] && SKIP_BUILD=1
 
 log()  { printf '\033[1;32m[%s]\033[0m %s\n' "$(date '+%H:%M:%S')" "$*"; }
 fail() { printf '\033[1;31m[GAGAL]\033[0m %s\n' "$*" >&2; exit 1; }
@@ -46,58 +47,38 @@ git pull --ff-only origin "$BRANCH" || fail "git pull gagal (diverged / SSH key?
 NEW_SHA="$(git rev-parse --short HEAD)"
 
 if [ "$OLD_SHA" = "$NEW_SHA" ]; then
-    log "Tidak ada commit baru ($NEW_SHA). Deploy tetap dilanjutkan."
+    log "Tidak ada commit baru ($NEW_SHA). Deploy tetap dilanjutkan (build ulang image)."
 else
     log "Update $OLD_SHA → $NEW_SHA"
     git --no-pager log --oneline "$OLD_SHA..$NEW_SHA"
 fi
 
-# 2. Image & PHP deps
-if git diff --name-only "$OLD_SHA" "$NEW_SHA" | grep -q '^Dockerfile$'; then
-    log "Dockerfile berubah → build ulang image..."
-    docker compose build
-fi
+# 2. Build image self-contained (composer install + wayfinder + npm build
+#    semua terjadi di dalam `docker build`, lihat Dockerfile).
+log "Build image (composer install + npm build di dalam image)..."
+docker compose build app
 
-log "composer install..."
-docker compose run --rm -T app composer install --no-dev --optimize-autoloader --no-interaction
-
-# 3. Frontend
-if [ "$SKIP_BUILD" = 0 ]; then
-    log "Generate route Wayfinder..."
-    docker compose run --rm -T app php artisan wayfinder:generate --with-form
-
-    log "Build frontend ($NODE_IMAGE)..."
-    docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp \
-        -v "$APP_DIR":/app -w /app "$NODE_IMAGE" \
-        sh -c "npm ci --no-audit --no-fund && npm run build"
-else
-    log "Build frontend dilewati (--no-build)."
-fi
-
-# 4. Rilis
-log "Maintenance mode ON..."
+# 3. Rilis
+log "Maintenance mode ON (container lama)..."
 docker exec alfinance_app php artisan down --retry=15 || true
 IN_MAINTENANCE=1
 
+log "Restart container dengan image baru..."
+docker compose up -d app queue scheduler
+
+# File flag maintenance ikut hilang saat container lama diganti (bukan di
+# volume persisten), jadi dikunci lagi di container baru sebelum migrasi.
+log "Maintenance mode ON (container baru)..."
+docker exec alfinance_app php artisan down --retry=15 || true
+
 log "Migrasi database..."
 docker exec alfinance_app php artisan migrate --force
-
-log "Refresh cache Laravel..."
-docker exec alfinance_app php artisan optimize:clear
-docker exec alfinance_app php artisan optimize
-
-log "Permission storage..."
-docker exec alfinance_app chown -R www-data:www-data storage bootstrap/cache
-
-log "Restart container..."
-docker compose up -d
-docker compose restart app queue scheduler nginx
 
 log "Maintenance mode OFF..."
 docker exec alfinance_app php artisan up
 IN_MAINTENANCE=0
 
-# 5. Cek
+# 4. Cek
 sleep 3
 docker compose ps
 if docker compose ps --status restarting --services | grep -q .; then

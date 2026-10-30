@@ -17,6 +17,8 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -62,4 +64,27 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // Semua error 400–504 di halaman web (bukan API/JSON) ditampilkan
+        // lewat satu halaman Inertia (`resources/js/pages/errors/Show.vue`)
+        // berisi alert beranimasi + penjelasan + solusi, bukan halaman error
+        // bawaan Laravel yang polos. Dimatikan di local/testing supaya
+        // Ignition tetap tampil untuk debugging.
+        $exceptions->respond(function (Response $response, Throwable $e, Request $request) {
+            $status = $response->getStatusCode();
+
+            $shouldRenderErrorPage = $status >= 400
+                && $status <= 504
+                && ! $request->is('api/*')
+                && ! $request->expectsJson()
+                && ! app()->environment(['local', 'testing']);
+
+            if (! $shouldRenderErrorPage) {
+                return $response;
+            }
+
+            return Inertia::render('errors/Show', ['status' => $status])
+                ->toResponse($request)
+                ->setStatusCode($status);
+        });
     })->create();

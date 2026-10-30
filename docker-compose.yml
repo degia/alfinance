@@ -1,11 +1,18 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      target: app
     image: alfinance-app
     container_name: alfinance_app
     restart: always
+    env_file:
+      - .env
+    ports:
+      - "8087:80"
     volumes:
-      - .:/var/www
+      - storage_app:/var/www/storage/app
+      - storage_logs:/var/www/storage/logs
     depends_on:
       - redis
     networks:
@@ -16,8 +23,11 @@ services:
     container_name: alfinance_queue
     restart: always
     command: php artisan horizon
+    env_file:
+      - .env
     volumes:
-      - .:/var/www
+      - storage_app:/var/www/storage/app
+      - storage_logs:/var/www/storage/logs
     depends_on:
       - app
       - redis
@@ -29,8 +39,11 @@ services:
     container_name: alfinance_scheduler
     restart: always
     command: php artisan schedule:work
+    env_file:
+      - .env
     volumes:
-      - .:/var/www
+      - storage_app:/var/www/storage/app
+      - storage_logs:/var/www/storage/logs
     depends_on:
       - app
       - redis
@@ -44,20 +57,10 @@ services:
     networks:
       - alfinance_net
 
-  nginx:
-    image: nginx:alpine
-    container_name: alfinance_nginx
-    restart: always
-    ports:
-      - "8087:80"
-    volumes:
-      - .:/var/www
-      - ./nginx/conf.d:/etc/nginx/conf.d
-    depends_on:
-      - app
-    networks:
-      - alfinance_net
-
 networks:
   alfinance_net:
     driver: bridge
+
+volumes:
+  storage_app:
+  storage_logs:

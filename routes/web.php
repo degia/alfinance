@@ -17,6 +17,7 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 /*
 |--------------------------------------------------------------------------
@@ -207,5 +208,22 @@ Route::middleware(['auth', 'verified', 'workspace.selected'])->group(function ()
     Route::post('debts/{debt}/payments', [DebtController::class, 'recordPayment'])->name('debts.payments.store');
     Route::delete('debts/{debt}', [DebtController::class, 'destroy'])->name('debts.destroy');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Pratinjau halaman error (khusus local)
+|--------------------------------------------------------------------------
+| `bootstrap/app.php` mematikan halaman error kustom saat APP_ENV=local
+| supaya Ignition tetap tampil untuk debugging. Rute ini membiarkan kita
+| melihat tampilan `errors/Show.vue` untuk kode status mana pun tanpa
+| mengubah APP_DEBUG.
+*/
+if (app()->environment('local')) {
+    Route::get('debug/errors/{status}', fn (int $status) => Inertia::render('errors/Show', ['status' => $status])
+        ->toResponse(request())
+        ->setStatusCode($status))
+        ->whereNumber('status')
+        ->name('debug.errors.show');
+}
 
 require __DIR__.'/settings.php';
