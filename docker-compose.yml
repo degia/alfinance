@@ -15,6 +15,9 @@ services:
     image: alfinance-app
     container_name: alfinance_queue
     restart: always
+    # Samakan user dengan PHP-FPM agar berkas hasil antrean (ekspor/backup)
+    # tidak lagi dimiliki root dan tetap bisa dibaca web.
+    user: "www-data"
     command: php artisan horizon
     volumes:
       - .:/var/www
@@ -28,6 +31,7 @@ services:
     image: alfinance-app
     container_name: alfinance_scheduler
     restart: always
+    user: "www-data"
     command: php artisan schedule:work
     volumes:
       - .:/var/www
@@ -49,7 +53,7 @@ services:
     container_name: alfinance_nginx
     restart: always
     ports:
-      - "8087:80"
+      - "80:80"
     volumes:
       - .:/var/www
       - ./nginx/conf.d:/etc/nginx/conf.d

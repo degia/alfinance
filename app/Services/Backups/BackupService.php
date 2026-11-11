@@ -2,6 +2,8 @@
 
 namespace App\Services\Backups;
 
+use App\Enums\BackupScope;
+use App\Enums\BackupStatus;
 use App\Jobs\GenerateNetWorthSnapshotJob;
 use App\Jobs\RecomputeBudgetProgressJob;
 use App\Jobs\RecomputeDashboardSnapshotJob;
@@ -10,6 +12,7 @@ use App\Models\Backup;
 use App\Services\Cache\WorkspaceCache;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use JsonException;
@@ -84,6 +87,98 @@ final class BackupService
         $summary = $payload['summary'];
 
         $backup->markDone($path, $name, strlen($json), $summary);
+    }
+
+    /**
+     * Impor berkas backup JSON yang diunggah pengguna (mis. hasil unduhan dari
+     * server lain) lalu catat sebagai backup selesai. Skema divalidasi lebih
+     * dulu supaya berkas rusak tidak pernah masuk riwayat; setelah tersimpan,
+     * berkas mengikuti alur preview/restore yang sama dengan backup biasa.
+     */
+    public function import(UploadedFile $file, int $workspaceId, ?int $userId): Backup
+    {
+        $raw = $file->getContent();
+
+        if ($raw === false || $raw === '') {
+            throw new RuntimeException('Berkas backup kosong.');
+        }
+
+        try {
+            $payload = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new RuntimeException('Berkas backup bukan JSON yang valid.', 0, $exception);
+        }
+
+        if (! is_array($payload)) {
+            throw new RuntimeException('Isi backup bukan objek JSON.');
+        }
+
+        $errors = $this->validatePayload($payload);
+
+        if ($errors !== []) {
+            throw new RuntimeException('Backup tidak valid: '.implode(' ', $errors));
+        }
+
+        /** @var array<string, mixed> $meta */
+        $meta = $payload['meta'];
+        $scope = BackupScope::tryFrom((string) ($meta['scope'] ?? '')) ?? BackupScope::Full;
+
+        /** @var array<string, mixed> $range */
+        $range = is_array($meta['range'] ?? null) ? $meta['range'] : [];
+
+        $name = sprintf(
+            'backup-%d-imported-%s.json',
+            $workspaceId,
+            CarbonImmutable::now()->format('Ymd-His'),
+        );
+        $path = $workspaceId.'/'.$name;
+
+        if (! Storage::disk('backups')->put($path, $raw)) {
+            throw new RuntimeException('Berkas backup tidak bisa disimpan ke storage.');
+        }
+
+        $backup = new Backup([
+            'workspace_id' => $workspaceId,
+            'user_id' => $userId,
+            'scope' => $scope,
+            'from' => $scope->needsRange() ? ($range['from'] ?? null) : null,
+            'to' => $scope->needsRange() ? ($range['to'] ?? null) : null,
+            'schema_version' => self::SCHEMA_VERSION,
+            'status' => BackupStatus::Done,
+            'file_path' => $path,
+            'file_name' => $name,
+            'size_bytes' => strlen($raw),
+            'summary' => $this->summaryOf($payload),
+            'completed_at' => CarbonImmutable::now(),
+        ]);
+
+        $backup->save();
+
+        return $backup;
+    }
+
+    /**
+     * Hitung jumlah baris per bagian dari payload yang diimpor. Berkas dari
+     * versi lama mungkin tidak memuat `summary`, jadi dihitung ulang dari
+     * daftar barisnya.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, int>
+     */
+    private function summaryOf(array $payload): array
+    {
+        $summary = [];
+
+        foreach (array_keys(self::TABLES) as $key) {
+            $rows = $payload[$key] ?? [];
+
+            $summary[$key] = is_array($rows) ? count($rows) : 0;
+        }
+
+        $pivot = $payload['transaction_tag'] ?? [];
+        $summary['transaction_tag'] = is_array($pivot) ? count($pivot) : 0;
+
+        return $summary;
     }
 
     /**

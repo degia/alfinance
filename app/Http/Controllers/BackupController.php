@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\BackupScope;
 use App\Enums\BackupStatus;
 use App\Http\Controllers\Concerns\AuthorizesWorkspaceData;
+use App\Http\Requests\ImportBackupRequest;
 use App\Http\Requests\RestoreBackupRequest;
 use App\Http\Requests\StoreBackupRequest;
 use App\Jobs\ProcessBackupJob;
@@ -53,6 +54,37 @@ class BackupController extends Controller
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => __('Backup :scope sedang diproses di antrean.', ['scope' => $scope->label()]),
+        ]);
+
+        return back();
+    }
+
+    /**
+     * Impor berkas backup JSON yang diunggah pengguna. Berkas divalidasi dan
+     * disimpan sebagai backup selesai, lalu dapat dipratinjau/dipulihkan lewat
+     * alur restore yang sama dengan backup hasil pembuatan di server.
+     */
+    public function import(ImportBackupRequest $request): RedirectResponse
+    {
+        $this->authorizeEditData();
+
+        try {
+            $backup = $this->backups->import(
+                $request->file('file'),
+                ActiveWorkspace::idOrFail(),
+                $request->user()?->id,
+            );
+        } catch (RuntimeException $exception) {
+            $this->flashError($exception->getMessage());
+
+            return back();
+        }
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('Backup :name berhasil diimpor. Pratinjau dulu sebelum memulihkan.', [
+                'name' => $backup->file_name,
+            ]),
         ]);
 
         return back();
