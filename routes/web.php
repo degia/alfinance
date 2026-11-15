@@ -43,7 +43,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index');
     Route::post('workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
     Route::post('workspaces/{workspace}/switch', [WorkspaceController::class, 'switch'])->name('workspaces.switch');
-    Route::delete('workspaces/{workspace}', [WorkspaceController::class, 'leave'])->name('workspaces.leave');
+    Route::delete('workspaces/{workspace}/leave', [WorkspaceController::class, 'leave'])->name('workspaces.leave');
+
+    // Penghapusan dibuat dua langkah: `destroy` memindahkan ke Sampah (bisa
+    // dibatalkan lewat `restore`), `force` baru membuang datanya permanen.
+    // `restore`/`force` memakai `withTrashed()` karena targetnya justru baris
+    // yang sudah tersaring keluar oleh scope soft delete.
+    Route::delete('workspaces/{workspace}', [WorkspaceController::class, 'destroy'])->name('workspaces.destroy');
+    Route::post('workspaces/{workspace}/restore', [WorkspaceController::class, 'restore'])
+        ->withTrashed()
+        ->name('workspaces.restore');
+    Route::delete('workspaces/{workspace}/force', [WorkspaceController::class, 'forceDestroy'])
+        ->withTrashed()
+        ->name('workspaces.forceDestroy');
 
     // Preferensi UI ringan (tidak melalui Inertia, dipanggil dengan debounce).
     Route::post('settings/sidebar', SidebarPreferenceController::class)->name('settings.sidebar');
@@ -226,4 +238,5 @@ if (app()->environment('local')) {
         ->name('debug.errors.show');
 }
 
+require __DIR__.'/admin.php';
 require __DIR__.'/settings.php';

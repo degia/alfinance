@@ -1,9 +1,12 @@
 <?php
 
+use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Http\Middleware\EnsureUserIsNotSuspended;
 use App\Http\Middleware\EnsureWorkspaceSelected;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SetActiveWorkspaceScope;
+use App\Http\Middleware\TrackUserActivity;
 use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -30,6 +33,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         $middleware->web(append: [
+            EnsureUserIsNotSuspended::class,
+            TrackUserActivity::class,
             SetActiveWorkspaceScope::class,
             HandleAppearance::class,
             HandleInertiaRequests::class,
@@ -38,6 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'workspace.selected' => EnsureWorkspaceSelected::class,
+            'admin' => EnsureUserIsAdmin::class,
         ]);
 
         // `SetActiveWorkspaceScope` harus jalan SETELAH StartSession (butuh
@@ -48,11 +54,18 @@ return Application::configure(basePath: dirname(__DIR__))
         //
         // Posisi ini aman terhadap middleware `auth`: user dibaca dari session
         // lewat auth guard, bukan dari hasil middleware `auth`.
+        //
+        // `EnsureUserIsNotSuspended` sengaja berada paling awal di antara
+        // ketiganya supaya akun yang ditangguhkan tidak sempat menyentuh
+        // workspace apa pun, dan `TrackUserActivity` menyusul agar aktivitas
+        // yang dicatat hanya milik sesi yang masih sah.
         $middleware->priority([
             EncryptCookies::class,
             AddQueuedCookiesToResponse::class,
             StartSession::class,
             ShareErrorsFromSession::class,
+            EnsureUserIsNotSuspended::class,
+            TrackUserActivity::class,
             SetActiveWorkspaceScope::class,
             AuthenticatesRequests::class,
             ThrottleRequests::class,

@@ -1,4 +1,5 @@
 export * from './account';
+export * from './admin';
 export * from './auth';
 export * from './budget';
 export * from './category';

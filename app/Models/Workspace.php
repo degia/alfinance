@@ -10,13 +10,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Satu workspace = satu "buku keuangan" (ARCHITECTURE.md §3).
  *
+ * Memakai soft delete: `delete()` memindahkan workspace ke "Sampah" (hilang
+ * dari daftar, switcher, dan resolusi workspace aktif karena scope soft delete
+ * ikut berlaku pada relasi `users()->workspaces()`), sedangkan `forceDelete()`
+ * membuang barisnya sehingga seluruh tabel tenant ikut terhapus lewat cascade.
+ *
  * @property int $id
  * @property string $name
  * @property int $owner_id
+ * @property Carbon|null $deleted_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read WorkspaceUser|null $pivot Pivot aktif saat dimuat lewat relasi `users()`
@@ -31,7 +38,7 @@ class Workspace extends Model
     public const string PIVOT_TABLE = 'workspace_user';
 
     /** @use HasFactory<WorkspaceFactory> */
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     /**
      * @return array<string, string>

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Enums\UserRole;
 use App\Enums\WorkspaceRole;
+use App\Http\Middleware\TrackUserActivity;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -22,6 +25,12 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string $email
  * @property Carbon|null $email_verified_at
  * @property string $password
+ * @property UserRole $role
+ * @property Carbon|null $suspended_at
+ * @property string|null $suspended_reason
+ * @property Carbon|null $last_login_at
+ * @property string|null $last_login_ip
+ * @property Carbon|null $last_seen_at
  * @property bool $sidebar_collapsed
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
@@ -35,6 +44,12 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
+    /**
+     * Berapa lama sejak aktivitas terakhir seorang user masih dianggap online.
+     * `last_seen_at` ditulis {@see TrackUserActivity}.
+     */
+    public const int ONLINE_WINDOW_MINUTES = 5;
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
@@ -53,10 +68,15 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
      * Workspace dengan anggota lain diwariskan ke admin (atau anggota
      * terlama bila tidak ada admin). Workspace tanpa anggota lain dihapus
      * karena tidak ada pihak lain yang berhak atas datanya.
+     *
+     * Workspace yang sedang berada di "Sampah" (soft deleted) ikut diproses:
+     * selama barisnya masih ada, FK `workspaces.owner_id` tetap menahan
+     * penghapusan akun ini. Penghapusannya memakai `forceDelete()` dengan
+     * alasan yang sama — soft delete tidak melepaskan FK.
      */
     public function handOverOwnedWorkspaces(): void
     {
-        Workspace::query()
+        Workspace::withTrashed()
             ->where('owner_id', $this->getKey())
             ->get()
             ->each(function (Workspace $workspace): void {
@@ -71,7 +91,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
                     ->first();
 
                 if (! $successor instanceof User) {
-                    $workspace->delete();
+                    $workspace->forceDelete();
 
                     return;
                 }
@@ -93,9 +113,64 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'role' => UserRole::class,
+            'suspended_at' => 'datetime',
+            'last_login_at' => 'datetime',
+            'last_seen_at' => 'datetime',
             'sidebar_collapsed' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | Role global & status akun
+     |--------------------------------------------------------------------------
+     |
+     | `role` sengaja TIDAK masuk daftar fillable supaya tidak pernah bisa naik
+     | level lewat mass assignment dari request. Perubahannya hanya lewat
+     | panel admin atau perintah `user:make-admin`.
+     */
+
+    public function isAdmin(): bool
+    {
+        return $this->role === UserRole::Admin;
+    }
+
+    public function isSuspended(): bool
+    {
+        return $this->suspended_at !== null;
+    }
+
+    public function isOnline(): bool
+    {
+        return $this->last_seen_at?->greaterThanOrEqualTo(
+            now()->subMinutes(self::ONLINE_WINDOW_MINUTES),
+        ) ?? false;
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     */
+    public function scopeAdmins(Builder $query): void
+    {
+        $query->where('role', UserRole::Admin->value);
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     */
+    public function scopeOnline(Builder $query): void
+    {
+        $query->where('last_seen_at', '>=', now()->subMinutes(self::ONLINE_WINDOW_MINUTES));
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     */
+    public function scopeSuspended(Builder $query): void
+    {
+        $query->whereNotNull('suspended_at');
     }
 
     /**

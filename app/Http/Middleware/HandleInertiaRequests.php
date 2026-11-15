@@ -47,6 +47,9 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $user,
+                // Dipisah dari `user.role` supaya komponen cukup membaca satu
+                // boolean dan tidak perlu tahu daftar nilai enum role global.
+                'is_admin' => (bool) $user?->isAdmin(),
             ],
             'workspace' => $this->workspacePayload($user, $this->activeWorkspace()),
             'workspaces' => $this->workspacesPayload($user, $this->activeWorkspace()),

@@ -22,6 +22,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Admin Global
+    |--------------------------------------------------------------------------
+    |
+    | Email akun yang dijadikan Admin global oleh AdminUserSeeder. Role admin
+    | sendiri disimpan di kolom `users.role`; nilai ini hanya menentukan akun
+    | mana yang di-bootstrap saat seeding. Setelah itu pakai perintah
+    | `php artisan user:make-admin {email}` untuk menunjuk admin lain.
+    |
+    */
+
+    'admin_email' => env('ADMIN_EMAIL', 'admin@aturaja.my.id'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Authentication Guards
     |--------------------------------------------------------------------------
     |

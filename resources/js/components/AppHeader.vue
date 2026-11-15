@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/tooltip';
 import UserMenuContent from '@/components/UserMenuContent.vue';
 import WorkspaceSwitcher from '@/components/WorkspaceSwitcher.vue';
+import { useAuth } from '@/composables/useAuth';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { getInitials } from '@/composables/useInitials';
 import { toUrl } from '@/lib/utils';
@@ -57,6 +58,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const page = usePage();
 const auth = computed(() => page.props.auth);
+const { isAdmin } = useAuth();
 const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
 
 const activeItemStyles =
@@ -70,18 +72,26 @@ const mainNavItems: NavItem[] = [
     },
 ];
 
-const rightNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
-    },
-];
+/**
+ * Sama seperti footer sidebar: tautan pengembang disembunyikan dari pengguna
+ * biasa. Lihat `AppSidebar.vue`.
+ */
+const rightNavItems = computed<NavItem[]>(() =>
+    isAdmin.value
+        ? [
+              {
+                  title: 'Repository',
+                  href: 'https://github.com/laravel/vue-starter-kit',
+                  icon: Folder,
+              },
+              {
+                  title: 'Documentation',
+                  href: 'https://laravel.com/docs/starter-kits#vue',
+                  icon: BookOpen,
+              },
+          ]
+        : [],
+);
 </script>
 
 <template>

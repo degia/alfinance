@@ -67,16 +67,16 @@ Transaksi baru disimpan
 
 ## 3. Multi-Tenant / Workspace Model
 
-- `users` — akun login.
-- `workspaces` — satu workspace = satu "buku keuangan".
+- `users` — akun login. Punya `role` global (`user`/`admin`) yang **terpisah** dari role workspace: admin global mengelola akun & aplikasi, bukan isi buku keuangan orang lain.
+- `workspaces` — satu workspace = satu "buku keuangan". Memakai soft delete: `delete()` memindahkannya ke "Sampah" (hilang dari daftar, switcher, dan resolusi workspace aktif), `forceDelete()` membuang seluruh data tenant lewat cascade + berkas di disk `local`/`exports`/`backups`.
 - `workspace_user` (pivot) — role: owner/admin/member/viewer.
 - Semua tabel data (accounts, transactions, budgets, categories, debts, net_worth_items) memiliki `workspace_id` dan **global scope** Eloquent yang otomatis memfilter berdasarkan workspace aktif di session — mencegah kebocoran data antar workspace.
 - Middleware `EnsureWorkspaceSelected` + `SetActiveWorkspaceScope` dijalankan di awal setiap request.
 
 ## 4. Skema Data Inti (ringkas)
 
-- `users(id, name, email, password, ...)`
-- `workspaces(id, name, owner_id, ...)`
+- `users(id, name, email, password, role[user|admin], suspended_at, suspended_reason, last_login_at, last_login_ip, last_seen_at, ...)`
+- `workspaces(id, name, owner_id, deleted_at, ...)`
 - `workspace_user(workspace_id, user_id, role)`
 - `accounts(id, workspace_id, type[kas|bank|ewallet|tabungan|kartu_kredit], name, cached_balance, credit_limit, billing_date, due_date, archived_at)`
 - `categories(id, workspace_id, parent_id, name, icon, color)`
@@ -104,6 +104,16 @@ Transaksi baru disimpan
 - Policy per model (Laravel Authorization) berbasis role workspace.
 - File upload (lampiran bukti) divalidasi tipe & ukuran, disimpan di storage disk terpisah per workspace.
 - Rate limiting pada endpoint export & backup.
+- `users.role` tidak masuk daftar fillable, sehingga role tidak bisa dinaikkan lewat mass assignment; perubahannya hanya lewat panel admin (`UserPolicy`) atau `php artisan user:make-admin`.
+- Middleware `EnsureUserIsNotSuspended` mengeluarkan akun yang ditangguhkan dari sesinya pada request berikutnya — termasuk sesi "remember me" dan passkey.
+
+### 5.1 Panel admin (`/admin`, middleware `admin`)
+
+- Dijaga role global `admin` dan berada **di luar** `workspace.selected`: panel mengurus akun, bukan buku keuangan.
+- Isi: ringkasan pengguna/sistem, manajemen pengguna (role, tangguhkan, verifikasi email, reset sandi, putus sesi, hapus akun), dan daftar/ekspor email.
+- `UserPolicy` menjaga agar admin tidak bisa menangguhkan, menurunkan role, atau menghapus akunnya sendiri; admin terakhir juga tidak bisa diturunkan.
+- Gate `viewTelescope` & `viewHorizon` ikut memakai role ini (sebelumnya allow-list email kosong).
+- "Putus semua sesi" butuh `SESSION_DRIVER=database`; pada driver lain aksinya disembunyikan karena tidak ada relasi sesi→user yang bisa ditelusuri.
 
 ## 6. Deployment (dev lokal)
 

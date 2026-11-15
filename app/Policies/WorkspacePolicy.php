@@ -11,6 +11,12 @@ use App\Models\Workspace;
  *
  * Semua keputusan diambil dari pivot role user pada workspace yangdicek —
  * bukan dari atribut global user.
+ *
+ * Pengecualian tunggal: `restore`/`forceDelete` juga terbuka untuk Admin
+ * global, karena keduanya mengurus siklus hidup workspace (memulihkan atau
+ * membuang isi "Sampah") dan bukan akses baca/tulis ke data keuangannya.
+ * Sengaja tidak dipasang sebagai `before()` supaya Admin global tetap tidak
+ * bisa `view`/`editData` buku keuangan milik orang lain.
  */
 class WorkspacePolicy
 {
@@ -37,9 +43,28 @@ class WorkspacePolicy
         return $this->role($user, $workspace)?->canUpdateWorkspace() ?? false;
     }
 
+    /**
+     * Pindahkan workspace ke "Sampah" (soft delete).
+     */
     public function delete(User $user, Workspace $workspace): bool
     {
         return $this->role($user, $workspace)?->canDeleteWorkspace() ?? false;
+    }
+
+    /**
+     * Keluarkan workspace dari "Sampah".
+     */
+    public function restore(User $user, Workspace $workspace): bool
+    {
+        return $workspace->owner_id === $user->id || $user->isAdmin();
+    }
+
+    /**
+     * Buang workspace beserta seluruh datanya, permanen.
+     */
+    public function forceDelete(User $user, Workspace $workspace): bool
+    {
+        return $workspace->owner_id === $user->id || $user->isAdmin();
     }
 
     public function manageMembers(User $user, Workspace $workspace): bool

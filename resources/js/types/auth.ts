@@ -1,3 +1,8 @@
+/**
+ * Role global, terpisah dari role per workspace (lihat `WorkspaceRole`).
+ */
+export type UserRole = 'user' | 'admin';
+
 export type User = {
     id: number;
     name: string;
@@ -5,6 +10,10 @@ export type User = {
     avatar?: string;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
+    role: UserRole;
+    suspended_at: string | null;
+    last_login_at: string | null;
+    last_seen_at: string | null;
     created_at: string;
     updated_at: string;
     [key: string]: unknown;
@@ -12,6 +21,8 @@ export type User = {
 
 export type Auth = {
     user: User;
+    /** Ringkasan `user.role === 'admin'` dari server. */
+    is_admin: boolean;
 };
 
 export type Passkey = {
