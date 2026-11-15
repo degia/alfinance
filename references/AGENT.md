@@ -11,6 +11,7 @@ Kamu adalah AI coding agent yang bertugas membangun **Alfinance.com**, aplikasi 
 5. Commit kecil per unit kerja logis, pesan commit jelas (mis. `feat(accounts): CRUD akun + arsip`).
 6. Gunakan Inertia + Vue 3 untuk semua halaman — jangan campur Blade untuk UI utama (Blade hanya untuk export PDF).
 7. Ikuti gaya UI Neumorphism & palet warna White/Blue/Purple konsisten — buat design tokens (Tailwind config) di awal (Fase 1) supaya semua komponen berikutnya konsisten, jangan hardcode warna di tiap file.
+8. Helper rute TypeScript (`resources/js/routes`, `resources/js/actions`) **selalu** di-generate dengan `composer wayfinder` — jangan pernah memanggil `php artisan wayfinder:generate` tanpa `--with-form`. Tanpa flag itu varian `.form` hilang, dan setiap halaman yang memakai `<Form v-bind="x.form()">` (seluruh alur Fortify + settings) gagal render tanpa error di sisi server — gejalanya form hilang dari layar, bukan halaman error. Direktori itu masuk `.gitignore`, jadi kerusakannya tidak terlihat di diff; `npm run types:check` adalah jaring pengamannya.
 
 ## Fase 0 — Bootstrap Proyek
 
